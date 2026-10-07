@@ -1,0 +1,599 @@
+:root {
+font-family:
+Inter,
+ui-sans-serif,
+system-ui,
+-apple-system,
+BlinkMacSystemFont,
+"Segoe UI",
+sans-serif;
+
+color: #172033;
+background: #f5f7fa;
+
+font-synthesis: none;
+text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+  }
+
+html {
+min-width: 320px;
+background: #f5f7fa;
+}
+
+body {
+margin: 0;
+min-width: 320px;
+min-height: 100vh;
+background: #f5f7fa;
+}
+
+button,
+input,
+select,
+textarea {
+font: inherit;
+}
+
+button {
+cursor: pointer;
+}
+
+button:disabled {
+cursor: not-allowed;
+opacity: 0.55;
+}
+
+.container {
+width: min(1180px, calc(100% - 32px));
+margin: 0 auto;
+}
+
+.site-header {
+background: #ffffff;
+border-bottom: 1px solid #e1e6ed;
+}
+
+.header-inner {
+min-height: 76px;
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 24px;
+}
+
+.brand {
+color: #111827;
+font-size: 1.35rem;
+font-weight: 800;
+text-decoration: none;
+letter-spacing: -0.02em;
+}
+
+.brand-subtitle {
+margin: 3px 0 0;
+color: #697386;
+font-size: 0.82rem;
+}
+
+.privacy-badge {
+padding: 7px 11px;
+border: 1px solid #cfd7e3;
+border-radius: 999px;
+background: #f8fafc;
+color: #344054;
+font-size: 0.78rem;
+font-weight: 650;
+}
+
+.hero {
+padding: 58px 0 30px;
+}
+
+.eyebrow {
+margin: 0 0 10px;
+color: #475467;
+font-size: 0.76rem;
+font-weight: 750;
+letter-spacing: 0.1em;
+}
+
+.hero h1 {
+max-width: 780px;
+margin: 0;
+color: #101828;
+font-size: clamp(2rem, 5vw, 3.5rem);
+line-height: 1.08;
+letter-spacing: -0.045em;
+}
+
+.hero-description {
+max-width: 700px;
+margin: 18px 0 0;
+color: #596579;
+font-size: 1.05rem;
+line-height: 1.65;
+}
+
+.security-notice {
+display: flex;
+align-items: flex-start;
+gap: 12px;
+margin-bottom: 22px;
+padding: 15px 17px;
+border: 1px solid #d7dee8;
+border-radius: 10px;
+background: #ffffff;
+color: #475467;
+line-height: 1.5;
+}
+
+.security-notice strong {
+color: #172033;
+white-space: nowrap;
+}
+
+.workspace {
+display: grid;
+gap: 18px;
+}
+
+.panel {
+overflow: hidden;
+border: 1px solid #dfe5ec;
+border-radius: 12px;
+background: #ffffff;
+box-shadow: 0 2px 7px rgba(16, 24, 40, 0.04);
+}
+
+.panel-header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 16px;
+padding: 18px 20px;
+border-bottom: 1px solid #e8ecf1;
+}
+
+.panel-header h2 {
+margin: 0;
+color: #172033;
+font-size: 1.05rem;
+}
+
+.panel-header p {
+margin: 4px 0 0;
+color: #667085;
+font-size: 0.84rem;
+}
+
+.file-button {
+display: inline-flex;
+align-items: center;
+justify-content: center;
+min-height: 38px;
+padding: 0 14px;
+border: 1px solid #cfd7e3;
+border-radius: 8px;
+background: #ffffff;
+color: #344054;
+font-size: 0.87rem;
+font-weight: 650;
+cursor: pointer;
+}
+
+.file-button:hover {
+background: #f8fafc;
+}
+
+.log-editor {
+display: block;
+width: 100%;
+min-height: 300px;
+padding: 18px 20px;
+border: 0;
+outline: none;
+resize: vertical;
+background: #fbfcfe;
+color: #172033;
+font-family:
+"SFMono-Regular",
+Consolas,
+"Liberation Mono",
+Menlo,
+monospace;
+font-size: 0.87rem;
+line-height: 1.6;
+tab-size: 2;
+}
+
+.log-editor:focus {
+background: #ffffff;
+}
+
+#output {
+background: #f8fafc;
+}
+
+.editor-footer {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 12px;
+min-height: 54px;
+padding: 9px 14px 9px 20px;
+border-top: 1px solid #e8ecf1;
+color: #667085;
+font-size: 0.78rem;
+}
+
+.controls {
+display: flex;
+align-items: center;
+gap: 14px;
+padding: 2px 0;
+}
+
+.profile-control {
+display: flex;
+align-items: center;
+gap: 9px;
+}
+
+.profile-control label {
+color: #344054;
+font-size: 0.85rem;
+font-weight: 650;
+}
+
+.profile-control select {
+min-height: 38px;
+padding: 0 32px 0 11px;
+border: 1px solid #cfd7e3;
+border-radius: 8px;
+background: #ffffff;
+color: #172033;
+}
+
+.strict-control {
+display: flex;
+align-items: center;
+gap: 8px;
+min-width: 210px;
+color: #344054;
+cursor: pointer;
+}
+
+.strict-control input {
+width: 16px;
+height: 16px;
+}
+
+.strict-control span {
+display: flex;
+flex-direction: column;
+gap: 2px;
+}
+
+.strict-control strong {
+font-size: 0.82rem;
+}
+
+.strict-control small {
+color: #667085;
+font-size: 0.72rem;
+}
+
+.button {
+min-height: 38px;
+padding: 0 15px;
+border-radius: 8px;
+font-size: 0.84rem;
+font-weight: 700;
+transition:
+background 120ms ease,
+border-color 120ms ease,
+opacity 120ms ease;
+}
+
+.button-primary {
+margin-left: auto;
+border: 1px solid #172033;
+background: #172033;
+color: #ffffff;
+}
+
+.button-primary:hover:not(:disabled) {
+background: #273248;
+}
+
+.button-secondary {
+border: 1px solid #cfd7e3;
+background: #ffffff;
+color: #344054;
+}
+
+.button-secondary:hover:not(:disabled) {
+background: #f8fafc;
+}
+
+.status-panel {
+padding: 15px 17px;
+border: 1px solid #dfe5ec;
+border-radius: 10px;
+background: #ffffff;
+}
+
+.status-row {
+display: flex;
+justify-content: space-between;
+gap: 16px;
+color: #344054;
+font-size: 0.82rem;
+font-weight: 700;
+}
+
+.progress-track {
+width: 100%;
+height: 7px;
+margin-top: 10px;
+overflow: hidden;
+border-radius: 999px;
+background: #e7ebf0;
+}
+
+.progress-bar {
+width: 0;
+height: 100%;
+background: #344054;
+transition: width 120ms linear;
+}
+
+.status-message {
+margin: 9px 0 0;
+color: #667085;
+font-size: 0.78rem;
+}
+
+.results {
+margin-top: 52px;
+}
+
+.section-heading h2 {
+margin: 0;
+color: #172033;
+font-size: 1.35rem;
+}
+
+.section-heading p {
+margin: 6px 0 0;
+color: #667085;
+font-size: 0.88rem;
+}
+
+.stats-grid {
+display: grid;
+grid-template-columns: repeat(4, 1fr);
+gap: 12px;
+margin-top: 18px;
+}
+
+.stat-card {
+padding: 18px;
+border: 1px solid #dfe5ec;
+border-radius: 10px;
+background: #ffffff;
+}
+
+.stat-label {
+display: block;
+color: #667085;
+font-size: 0.75rem;
+}
+
+.stat-card strong {
+display: block;
+margin-top: 7px;
+color: #172033;
+font-size: 1.35rem;
+}
+
+.match-list-container {
+margin-top: 18px;
+padding: 18px;
+border: 1px solid #dfe5ec;
+border-radius: 10px;
+background: #ffffff;
+}
+
+.match-list-container h3 {
+margin: 0 0 13px;
+color: #172033;
+font-size: 0.95rem;
+}
+
+.match-list {
+display: grid;
+gap: 8px;
+}
+
+.match-list.empty {
+color: #667085;
+font-size: 0.82rem;
+}
+
+.match-row {
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 16px;
+padding: 10px 12px;
+border: 1px solid #e7ebf0;
+border-radius: 8px;
+background: #fbfcfe;
+}
+
+.match-name {
+color: #344054;
+font-family:
+"SFMono-Regular",
+Consolas,
+monospace;
+font-size: 0.8rem;
+}
+
+.match-count {
+color: #172033;
+font-size: 0.8rem;
+font-weight: 750;
+}
+
+.how-it-works {
+margin: 52px 0;
+}
+
+.steps {
+display: grid;
+grid-template-columns: repeat(3, 1fr);
+gap: 14px;
+margin-top: 18px;
+}
+
+.step {
+padding: 20px;
+border: 1px solid #dfe5ec;
+border-radius: 10px;
+background: #ffffff;
+}
+
+.step-number {
+display: inline-flex;
+align-items: center;
+justify-content: center;
+width: 28px;
+height: 28px;
+border-radius: 50%;
+background: #172033;
+color: #ffffff;
+font-size: 0.75rem;
+font-weight: 800;
+}
+
+.step h3 {
+margin: 14px 0 7px;
+color: #172033;
+font-size: 0.94rem;
+}
+
+.step p {
+margin: 0;
+color: #667085;
+font-size: 0.82rem;
+line-height: 1.55;
+}
+
+.site-footer {
+border-top: 1px solid #e1e6ed;
+background: #ffffff;
+}
+
+.footer-inner {
+display: flex;
+justify-content: space-between;
+gap: 16px;
+padding: 24px 0;
+color: #667085;
+font-size: 0.76rem;
+}
+
+@media (max-width: 800px) {
+.controls {
+align-items: stretch;
+flex-direction: column;
+}
+
+.profile-control {
+align-items: flex-start;
+flex-direction: column;
+}
+
+.profile-control select {
+width: 100%;
+}
+
+.strict-control {
+min-width: 0;
+}
+
+.button-primary {
+width: 100%;
+margin-left: 0;
+}
+
+.stats-grid {
+grid-template-columns: repeat(2, 1fr);
+}
+
+.steps {
+grid-template-columns: 1fr;
+}
+}
+
+@media (max-width: 560px) {
+.container {
+width: min(100% - 20px, 1180px);
+}
+
+.header-inner {
+align-items: flex-start;
+flex-direction: column;
+justify-content: center;
+padding: 14px 0;
+}
+
+.privacy-badge {
+align-self: flex-start;
+}
+
+.hero {
+padding-top: 38px;
+}
+
+.hero h1 {
+font-size: 2rem;
+}
+
+.security-notice {
+flex-direction: column;
+}
+
+.panel-header {
+align-items: flex-start;
+flex-direction: column;
+}
+
+.file-button {
+width: 100%;
+}
+
+.log-editor {
+min-height: 240px;
+padding: 14px;
+}
+
+.editor-footer {
+padding-left: 14px;
+}
+
+.stats-grid {
+grid-template-columns: 1fr;
+}
+
+.footer-inner {
+align-items: flex-start;
+flex-direction: column;
+}
+}
