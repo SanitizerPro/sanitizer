@@ -10,12 +10,12 @@ permissions:
 contents: read
 
 concurrency:
-group: pages
+group: github-pages
 cancel-in-progress: true
 
 jobs:
 build:
-name: Build GitHub Pages
+name: Build and Test
 runs-on: ubuntu-latest
 
 ```
@@ -34,14 +34,27 @@ steps:
   - name: Run automated tests
     run: npm test
 
+  - name: Validate public files
+    run: |
+      test -f public/index.html
+      test -f public/styles.css
+      test -f public/app.js
+      test -f public/sanitizer.worker.js
+
   - name: Configure GitHub Pages
     uses: actions/configure-pages@v5
 
   - name: Prepare Pages site
     run: |
+      rm -rf _site
       mkdir -p _site
       cp -R public/. _site/
       touch _site/.nojekyll
+
+      echo "Pages site contents:"
+      find _site -maxdepth 2 -type f -print
+
+      test -f _site/index.html
 
   - name: Upload Pages artifact
     uses: actions/upload-pages-artifact@v4
@@ -65,7 +78,7 @@ environment:
   url: ${{ steps.deployment.outputs.page_url }}
 
 steps:
-  - name: Deploy Pages
+  - name: Deploy to GitHub Pages
     id: deployment
     uses: actions/deploy-pages@v4
 ```
