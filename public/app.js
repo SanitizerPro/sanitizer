@@ -1,103 +1,19 @@
-const inputElement =
-document.getElementById('input');
-
-const outputElement =
-document.getElementById('output');
-
-const fileInput =
-document.getElementById('file-input');
-
-const clearButton =
-document.getElementById('clear-button');
-
-const sanitizeButton =
-document.getElementById('sanitize-button');
-
-const copyButton =
-document.getElementById('copy-button');
-
-const downloadButton =
-document.getElementById('download-button');
-
-const strictMode =
-document.getElementById('strict-mode');
-
-const profileSelect =
-document.getElementById('profile-select');
-
-const inputSize =
-document.getElementById('input-size');
-
-const outputSize =
-document.getElementById('output-size');
-
-const resultInputSize =
-document.getElementById(
-'result-input-size'
-);
-
-const resultOutputSize =
-document.getElementById(
-'result-output-size'
-);
-
-const rulesMatched =
-document.getElementById(
-'rules-matched'
-);
-
-const totalMatches =
-document.getElementById(
-'total-matches'
-);
-
-const matchList =
-document.getElementById(
-'match-list'
-);
-
-const statusLabel =
-document.getElementById(
-'status-label'
-);
-
-const statusMessage =
-document.getElementById(
-'status-message'
-);
-
-const progressLabel =
-document.getElementById(
-'progress-label'
-);
-
-const progressBar =
-document.getElementById(
-'progress-bar'
-);
-
-let worker = null;
-let lastOutput = '';
-let selectedFileName = 'sanitized-output.txt';
+'use strict';
 
 const COMMON_RULES = [
 {
 id: 'common-jwt',
 description: 'JSON Web Token (JWT)',
 scope: 'line',
-regex:
-/bearer\s+(eyJ[a-zA-Z0-9_-]+.eyJ[a-zA-Z0-9_-]+.[a-zA-Z0-9_.-]+)/gi,
+regex: /bearer\s+(eyJ[a-zA-Z0-9_-]+.eyJ[a-zA-Z0-9_-]+.[a-zA-Z0-9_.-]+)/gi,
 replacementGroup: 1,
 tokenType: 'JWT'
 },
-
 {
 id: 'common-password-assignment',
-description:
-'Generic key-value password pattern',
+description: 'Generic key-value password pattern',
 scope: 'line',
-regex:
-/(password\s*[:=]\s*)([^\s"',;]+)/gi,
+regex: /(password\s*[:=]\s*)([^\s"',;]+)/gi,
 replacementGroup: 2,
 tokenType: 'PASSWORD'
 }
@@ -106,789 +22,862 @@ tokenType: 'PASSWORD'
 const PROFILES = {
 DEFAULT_SECURITY: {
 id: 'DEFAULT_SECURITY',
-name:
-'Default Security Baseline',
-description:
-'Standard security detection profile',
+name: 'Default Security Baseline',
+description: 'Standard security detection profile',
 rules: COMMON_RULES
 }
 };
 
-function createWorker() {
-terminateWorker();
+const elements = {
+inputText: document.getElementById('inputText'),
+fileInput: document.getElementById('fileInput'),
+clearButton: document.getElementById('clearButton'),
 
-worker = new Worker(
-'./sanitizer.worker.js',
-{
-type: 'classic'
-}
-);
+profileSelect: document.getElementById('profileSelect'),
+strictMode: document.getElementById('strictMode'),
+sanitizeButton: document.getElementById('sanitizeButton'),
 
-worker.addEventListener(
-'message',
-handleWorkerMessage
-);
+statusPanel: document.getElementById('statusPanel'),
+statusText: document.getElementById('statusText'),
+progressPercent: document.getElementById('progressPercent'),
+progressBar: document.getElementById('progressBar'),
 
-worker.addEventListener(
-'error',
-handleWorkerError
-);
+outputText: document.getElementById('outputText'),
+copyButton: document.getElementById('copyButton'),
+downloadButton: document.getElementById('downloadButton'),
 
-return worker;
-}
+errorPanel: document.getElementById('errorPanel'),
+errorText: document.getElementById('errorText'),
 
-function terminateWorker() {
-if (worker) {
-worker.terminate();
-worker = null;
-}
-}
+inputSize: document.getElementById('inputSize'),
+outputSize: document.getElementById('outputSize'),
+outputStatus: document.getElementById('outputStatus'),
 
-function handleWorkerMessage(event) {
-const message =
-event.data || {};
+rulesMatched: document.getElementById('rulesMatched'),
+totalMatches: document.getElementById('totalMatches'),
+statsInputSize: document.getElementById('statsInputSize'),
+statsOutputSize: document.getElementById('statsOutputSize'),
 
-switch (message.type) {
-case 'PROGRESS':
-handleProgress(
-message.payload
-);
-break;
+matchedRules: document.getElementById('matchedRules'),
+matchedRulesList: document.getElementById('matchedRulesList')
+};
 
-```
-case 'COMPLETE':
-  handleComplete(
-    message.payload
-  );
-  break;
+let worker = null;
+let currentRunId = 0;
+let currentInputFileName = null;
+let isProcessing = false;
 
-case 'COMPLETE_BLOB':
-  handleCompleteBlob(
-    message.payload
-  );
-  break;
+initialize();
 
-case 'ERROR':
-  handleError(
-    message.error
-  );
-  break;
-
-case 'CANCELLED':
-  handleCancelled();
-  break;
-
-default:
-  break;
-```
-
-}
+function initialize() {
+validateRequiredElements();
+populateProfiles();
+attachEventListeners();
+updateInputSize();
+updateOutputState();
+setStatus('Ready', 0);
 }
 
-function handleProgress(payload) {
-if (!payload) {
-return;
-}
-
-const percent =
-Number.isFinite(
-payload.percent
-)
-? payload.percent
-: 0;
-
-progressBar.style.width =
-`${percent}%`;
-
-progressBar.setAttribute(
-'aria-valuenow',
-String(percent)
-);
-
-progressLabel.textContent =
-`${percent}%`;
-
-statusLabel.textContent =
-'Sanitizing';
-
-statusMessage.textContent =
-`Processed ${formatBytes(
-      payload.processedBytes || 0
-    )} of ${formatBytes(
-      payload.totalBytes || 0
-    )}.`;
-}
-
-function handleComplete(payload) {
-if (!payload) {
-handleError(
-'Worker returned an invalid COMPLETE payload.'
-);
-return;
-}
-
-const sanitizedText =
-String(
-payload.sanitizedText ?? ''
-);
-
-finishSanitization(
-sanitizedText,
-payload.stats || {
-matches: {}
-}
-);
-}
-
-async function handleCompleteBlob(payload) {
-if (
-!payload ||
-!(payload.blob instanceof Blob)
-) {
-handleError(
-'Worker returned an invalid COMPLETE_BLOB payload.'
-);
-return;
-}
-
-try {
-const text =
-await payload.blob.text();
-
-```
-finishSanitization(
-  text,
-  payload.stats || {
-    matches: {}
-  }
-);
-```
-
-} catch (error) {
-handleError(
-error instanceof Error
-? error.message
-: String(error)
-);
-}
-}
-
-function finishSanitization(
-sanitizedText,
-stats
-) {
-lastOutput =
-sanitizedText;
-
-outputElement.value =
-sanitizedText;
-
-const inputText =
-inputElement.value;
-
-const inputBytes =
-getUtf8ByteLength(
-inputText
-);
-
-const outputBytes =
-getUtf8ByteLength(
-sanitizedText
-);
-
-inputSize.textContent =
-formatBytes(inputBytes);
-
-outputSize.textContent =
-formatBytes(outputBytes);
-
-resultInputSize.textContent =
-formatBytes(inputBytes);
-
-resultOutputSize.textContent =
-formatBytes(outputBytes);
-
-updateStatistics(
-stats
-);
-
-progressBar.style.width =
-'100%';
-
-progressBar.setAttribute(
-'aria-valuenow',
-'100'
-);
-
-progressLabel.textContent =
-'100%';
-
-statusLabel.textContent =
-'Completed';
-
-statusMessage.textContent =
-'Sanitization completed successfully.';
-
-copyButton.disabled =
-sanitizedText.length === 0;
-
-downloadButton.disabled =
-sanitizedText.length === 0;
-
-sanitizeButton.disabled =
-false;
-
-terminateWorker();
-}
-
-function handleError(message) {
-statusLabel.textContent =
-'Failed';
-
-statusMessage.textContent =
-message ||
-'Sanitization failed.';
-
-progressBar.style.width =
-'0%';
-
-progressBar.setAttribute(
-'aria-valuenow',
-'0'
-);
-
-progressLabel.textContent =
-'0%';
-
-copyButton.disabled =
-true;
-
-downloadButton.disabled =
-true;
-
-sanitizeButton.disabled =
-false;
-
-lastOutput = '';
-
-outputElement.value = '';
-
-terminateWorker();
-}
-
-function handleCancelled() {
-statusLabel.textContent =
-'Cancelled';
-
-statusMessage.textContent =
-'The sanitization operation was cancelled.';
-
-sanitizeButton.disabled =
-false;
-
-copyButton.disabled =
-true;
-
-downloadButton.disabled =
-true;
-
-terminateWorker();
-}
-
-async function sanitize() {
-const content =
-inputElement.value;
-
-if (!content) {
-statusLabel.textContent =
-'Ready';
-
-```
-statusMessage.textContent =
-  'Enter diagnostic content before sanitizing.';
-
-return;
-```
-
-}
-
-const profile =
-PROFILES[
-profileSelect.value
+function validateRequiredElements() {
+const required = [
+'inputText',
+'fileInput',
+'clearButton',
+'profileSelect',
+'strictMode',
+'sanitizeButton',
+'statusText',
+'progressPercent',
+'progressBar',
+'outputText',
+'copyButton',
+'downloadButton',
+'errorPanel',
+'errorText',
+'inputSize',
+'outputSize',
+'outputStatus',
+'rulesMatched',
+'totalMatches',
+'statsInputSize',
+'statsOutputSize',
+'matchedRules',
+'matchedRulesList'
 ];
 
-if (!profile) {
-handleError(
-'Selected security profile was not found.'
-);
-return;
+for (const key of required) {
+if (!elements[key]) {
+throw new Error(`SanitizeLog UI initialization failed: missing element '${key}'.`);
+}
+}
 }
 
-outputElement.value = '';
-lastOutput = '';
+function populateProfiles() {
+elements.profileSelect.innerHTML = '';
 
-copyButton.disabled = true;
-downloadButton.disabled = true;
-sanitizeButton.disabled = true;
+for (const profile of Object.values(PROFILES)) {
+const option = document.createElement('option');
+option.value = profile.id;
+option.textContent = profile.name;
+elements.profileSelect.appendChild(option);
+}
 
-progressBar.style.width =
-'0%';
+elements.profileSelect.value = 'DEFAULT_SECURITY';
+}
 
-progressBar.setAttribute(
-'aria-valuenow',
-'0'
-);
-
-progressLabel.textContent =
-'0%';
-
-statusLabel.textContent =
-'Starting';
-
-statusMessage.textContent =
-'Initializing local sanitization...';
-
-try {
-const activeWorker =
-createWorker();
-
-```
-activeWorker.postMessage({
-  type: 'START',
-
-  payload: {
-    content,
-
-    rules:
-      profile.rules,
-
-    options: {
-      strict:
-        strictMode.checked
-    }
-  }
+function attachEventListeners() {
+elements.inputText.addEventListener('input', () => {
+currentInputFileName = null;
+updateInputSize();
+hideError();
 });
-```
 
-} catch (error) {
-handleError(
-error instanceof Error
-? error.message
-: String(error)
-);
-}
-}
+elements.fileInput.addEventListener('change', handleFileSelection);
 
-function updateStatistics(stats) {
-const matches =
-stats &&
-stats.matches &&
-typeof stats.matches === 'object'
-? stats.matches
-: {};
+elements.clearButton.addEventListener('click', clearAll);
 
-const entries =
-Object.entries(matches)
-.filter(
-([, count]) =>
-Number.isFinite(count) &&
-count > 0
-);
+elements.sanitizeButton.addEventListener('click', startSanitization);
 
-const matchedRuleCount =
-entries.length;
+elements.copyButton.addEventListener('click', copyOutput);
 
-const totalMatchCount =
-entries.reduce(
-(total, [, count]) =>
-total + count,
-0
-);
+elements.downloadButton.addEventListener('click', downloadOutput);
 
-rulesMatched.textContent =
-String(
-matchedRuleCount
-);
-
-totalMatches.textContent =
-String(
-totalMatchCount
-);
-
-if (entries.length === 0) {
-matchList.className =
-'match-list empty';
-
-```
-matchList.textContent =
-  'No configured rules matched the input.';
-
-return;
-```
-
+window.addEventListener('beforeunload', terminateWorker);
 }
 
-matchList.className =
-'match-list';
-
-matchList.replaceChildren();
-
-for (
-const [ruleId, count]
-of entries
-) {
-const row =
-document.createElement(
-'div'
-);
-
-```
-row.className =
-  'match-row';
-
-const name =
-  document.createElement(
-    'span'
-  );
-
-name.className =
-  'match-name';
-
-name.textContent =
-  ruleId;
-
-const countElement =
-  document.createElement(
-    'span'
-  );
-
-countElement.className =
-  'match-count';
-
-countElement.textContent =
-  `${count} match${
-    count === 1
-      ? ''
-      : 'es'
-  }`;
-
-row.append(
-  name,
-  countElement
-);
-
-matchList.append(
-  row
-);
-```
-
-}
-}
-
-function updateInputSize() {
-const bytes =
-getUtf8ByteLength(
-inputElement.value
-);
-
-inputSize.textContent =
-formatBytes(bytes);
-}
-
-function clearInput() {
-terminateWorker();
-
-inputElement.value = '';
-outputElement.value = '';
-
-lastOutput = '';
-
-inputSize.textContent =
-'0 bytes';
-
-outputSize.textContent =
-'0 bytes';
-
-resultInputSize.textContent =
-'0 B';
-
-resultOutputSize.textContent =
-'0 B';
-
-rulesMatched.textContent =
-'0';
-
-totalMatches.textContent =
-'0';
-
-matchList.className =
-'match-list empty';
-
-matchList.textContent =
-'No rules have matched yet.';
-
-progressBar.style.width =
-'0%';
-
-progressBar.setAttribute(
-'aria-valuenow',
-'0'
-);
-
-progressLabel.textContent =
-'0%';
-
-statusLabel.textContent =
-'Ready';
-
-statusMessage.textContent =
-'Add diagnostic content and start sanitization.';
-
-copyButton.disabled =
-true;
-
-downloadButton.disabled =
-true;
-
-sanitizeButton.disabled =
-false;
-
-selectedFileName =
-'sanitized-output.txt';
-
-fileInput.value = '';
-}
-
-async function loadFile(event) {
-const file =
-event.target.files &&
-event.target.files[0];
+async function handleFileSelection(event) {
+const file = event.target.files?.[0];
 
 if (!file) {
 return;
 }
 
 try {
-const text =
-await file.text();
+hideError();
 
 ```
-inputElement.value =
-  text;
+setStatus('Loading file...', 0);
 
-selectedFileName =
-  buildOutputFileName(
-    file.name
-  );
+const text = await file.text();
+
+elements.inputText.value = text;
+currentInputFileName = file.name;
 
 updateInputSize();
+updateOutputState();
 
-statusLabel.textContent =
-  'Ready';
-
-statusMessage.textContent =
-  `${file.name} loaded locally.`;
-
-outputElement.value = '';
-lastOutput = '';
-
-copyButton.disabled =
-  true;
-
-downloadButton.disabled =
-  true;
+setStatus('File loaded', 0);
 ```
 
 } catch (error) {
-statusLabel.textContent =
-'Failed';
+showError(
+error instanceof Error
+? error.message
+: String(error)
+);
 
 ```
-statusMessage.textContent =
-  error instanceof Error
-    ? error.message
-    : String(error);
+setStatus('Ready', 0);
 ```
 
 } finally {
-fileInput.value = '';
+elements.fileInput.value = '';
 }
 }
 
+async function startSanitization() {
+if (isProcessing) {
+return;
+}
+
+const input = elements.inputText.value;
+
+if (!input) {
+resetOutput();
+
+```
+setStatus('Nothing to sanitize', 0);
+
+elements.inputText.focus();
+
+return;
+```
+
+}
+
+const profileId = elements.profileSelect.value;
+const profile = PROFILES[profileId];
+
+if (!profile) {
+showError(`Unknown security profile '${profileId}'.`);
+return;
+}
+
+if (!Array.isArray(profile.rules) || profile.rules.length === 0) {
+showError(`Security profile '${profileId}' contains no rules.`);
+return;
+}
+
+const runId = ++currentRunId;
+
+isProcessing = true;
+
+hideError();
+resetOutput();
+
+elements.sanitizeButton.disabled = true;
+elements.clearButton.disabled = true;
+elements.fileInput.disabled = true;
+elements.profileSelect.disabled = true;
+elements.strictMode.disabled = true;
+
+setStatus('Sanitizing...', 0);
+
+try {
+worker = createWorker();
+
+```
+const result = await runWorker(
+  worker,
+  input,
+  profile.rules,
+  {
+    strict: elements.strictMode.checked
+  },
+  runId
+);
+
+if (runId !== currentRunId) {
+  return;
+}
+
+finishSanitization(result.output, result.stats, input);
+```
+
+} catch (error) {
+if (runId !== currentRunId) {
+return;
+}
+
+```
+const message =
+  error instanceof Error
+    ? error.message
+    : String(error);
+
+showError(message);
+
+setStatus('Sanitization failed', 0);
+
+resetOutput();
+```
+
+} finally {
+if (runId === currentRunId) {
+isProcessing = false;
+
+```
+  elements.sanitizeButton.disabled = false;
+  elements.clearButton.disabled = false;
+  elements.fileInput.disabled = false;
+  elements.profileSelect.disabled = false;
+  elements.strictMode.disabled = false;
+
+  terminateWorker();
+}
+```
+
+}
+}
+
+function createWorker() {
+const workerInstance = new Worker(
+'./sanitizer.worker.js',
+{
+type: 'classic'
+}
+);
+
+return workerInstance;
+}
+
+function runWorker(workerInstance, content, rules, options, runId) {
+return new Promise((resolve, reject) => {
+let settled = false;
+
+```
+const cleanup = () => {
+  workerInstance.onmessage = null;
+  workerInstance.onerror = null;
+  workerInstance.onmessageerror = null;
+};
+
+const fail = (error) => {
+  if (settled) {
+    return;
+  }
+
+  settled = true;
+  cleanup();
+  reject(
+    error instanceof Error
+      ? error
+      : new Error(String(error))
+  );
+};
+
+const succeed = (result) => {
+  if (settled) {
+    return;
+  }
+
+  settled = true;
+  cleanup();
+  resolve(result);
+};
+
+workerInstance.onmessage = async (event) => {
+  if (runId !== currentRunId) {
+    return;
+  }
+
+  const message = event.data;
+
+  if (!message || typeof message.type !== 'string') {
+    fail(new Error('Worker returned an invalid message.'));
+    return;
+  }
+
+  switch (message.type) {
+    case 'PROGRESS': {
+      handleProgress(message.payload);
+      break;
+    }
+
+    case 'COMPLETE': {
+      if (!message.payload) {
+        fail(new Error('Worker returned an invalid COMPLETE payload.'));
+        return;
+      }
+
+      succeed({
+        output: String(message.payload.sanitizedText ?? ''),
+        stats: normalizeStats(message.payload.stats)
+      });
+
+      break;
+    }
+
+    case 'COMPLETE_BLOB': {
+      if (!message.payload?.blob) {
+        fail(new Error('Worker returned an invalid COMPLETE_BLOB payload.'));
+        return;
+      }
+
+      try {
+        const output = await message.payload.blob.text();
+
+        succeed({
+          output,
+          stats: normalizeStats(message.payload.stats)
+        });
+      } catch (error) {
+        fail(
+          error instanceof Error
+            ? error
+            : new Error(String(error))
+        );
+      }
+
+      break;
+    }
+
+    case 'ERROR': {
+      fail(
+        new Error(
+          typeof message.error === 'string'
+            ? message.error
+            : 'Sanitizer worker failed.'
+        )
+      );
+
+      break;
+    }
+
+    case 'CANCELLED': {
+      fail(new Error('Sanitization was cancelled.'));
+      break;
+    }
+
+    default: {
+      fail(
+        new Error(
+          `Unexpected worker message type '${message.type}'.`
+        )
+      );
+    }
+  }
+};
+
+workerInstance.onerror = (event) => {
+  fail(
+    new Error(
+      event?.message ||
+      'Sanitizer worker encountered an execution error.'
+    )
+  );
+};
+
+workerInstance.onmessageerror = () => {
+  fail(
+    new Error(
+      'Sanitizer worker message could not be deserialized.'
+    )
+  );
+};
+
+try {
+  workerInstance.postMessage({
+    type: 'START',
+    payload: {
+      content,
+      rules,
+      options
+    }
+  });
+} catch (error) {
+  fail(
+    error instanceof Error
+      ? error
+      : new Error(String(error))
+  );
+}
+```
+
+});
+}
+
+function handleProgress(payload) {
+if (!payload || typeof payload !== 'object') {
+return;
+}
+
+const processedBytes = Number(payload.processedBytes);
+const totalBytes = Number(payload.totalBytes);
+const percent = Number(payload.percent);
+
+if (
+!Number.isFinite(processedBytes) ||
+!Number.isFinite(totalBytes) ||
+!Number.isFinite(percent)
+) {
+return;
+}
+
+const safePercent = Math.max(
+0,
+Math.min(
+100,
+Math.floor(percent)
+)
+);
+
+elements.progressPercent.textContent = `${safePercent}%`;
+
+elements.progressBar.style.width = `${safePercent}%`;
+elements.progressBar.setAttribute(
+'aria-valuenow',
+String(safePercent)
+);
+
+if (totalBytes > 0) {
+elements.statusText.textContent =
+`Sanitizing... ${formatBytes(processedBytes)} / ${formatBytes(totalBytes)}`;
+} else {
+elements.statusText.textContent = 'Sanitizing...';
+}
+}
+
+function finishSanitization(output, stats, input) {
+const sanitizedOutput = String(output ?? '');
+const inputSize = utf8ByteLength(input);
+const outputSize = utf8ByteLength(sanitizedOutput);
+
+elements.outputText.value = sanitizedOutput;
+
+elements.inputSize.textContent = formatBytes(inputSize);
+elements.outputSize.textContent = formatBytes(outputSize);
+
+elements.statsInputSize.textContent = formatBytes(inputSize);
+elements.statsOutputSize.textContent = formatBytes(outputSize);
+
+const matchCounts = stats?.matches || {};
+const totalMatches = Object.values(matchCounts)
+.reduce(
+(total, value) => total + normalizeCount(value),
+0
+);
+
+const matchedRuleIds = Object.entries(matchCounts)
+.filter(([, count]) => normalizeCount(count) > 0)
+.map(([ruleId]) => ruleId);
+
+elements.rulesMatched.textContent =
+String(matchedRuleIds.length);
+
+elements.totalMatches.textContent =
+String(totalMatches);
+
+renderMatchedRules(matchCounts);
+
+elements.outputStatus.textContent =
+sanitizedOutput.length > 0
+? 'Sanitization completed successfully'
+: 'Sanitization completed with empty output';
+
+elements.copyButton.disabled = false;
+elements.downloadButton.disabled = false;
+
+setStatus('Sanitization complete', 100);
+}
+
+function renderMatchedRules(matchCounts) {
+elements.matchedRulesList.replaceChildren();
+
+const entries = Object.entries(matchCounts)
+.filter(([, count]) => normalizeCount(count) > 0);
+
+if (entries.length === 0) {
+elements.matchedRules.hidden = true;
+return;
+}
+
+for (const [ruleId, count] of entries) {
+const rule = findRuleById(ruleId);
+
+```
+const item = document.createElement('li');
+
+const name = document.createElement('span');
+name.className = 'matched-rule-name';
+name.textContent =
+  rule?.description ||
+  ruleId;
+
+const quantity = document.createElement('span');
+quantity.className = 'matched-rule-count';
+quantity.textContent =
+  String(normalizeCount(count));
+
+item.appendChild(name);
+item.appendChild(quantity);
+
+elements.matchedRulesList.appendChild(item);
+```
+
+}
+
+elements.matchedRules.hidden = false;
+}
+
+function findRuleById(ruleId) {
+for (const profile of Object.values(PROFILES)) {
+const rule = profile.rules.find(
+(candidate) => candidate.id === ruleId
+);
+
+```
+if (rule) {
+  return rule;
+}
+```
+
+}
+
+return null;
+}
+
 async function copyOutput() {
-if (!lastOutput) {
+const output = elements.outputText.value;
+
+if (!output) {
 return;
 }
 
 try {
-await navigator.clipboard.writeText(
-lastOutput
-);
+await navigator.clipboard.writeText(output);
 
 ```
-statusMessage.textContent =
-  'Sanitized output copied to the clipboard.';
+const originalText = elements.copyButton.textContent;
+
+elements.copyButton.textContent = 'Copied';
+
+window.setTimeout(() => {
+  elements.copyButton.textContent = originalText;
+}, 1500);
 ```
 
-} catch {
-outputElement.focus();
-outputElement.select();
+} catch (error) {
+try {
+elements.outputText.focus();
+elements.outputText.select();
 
 ```
-const copied =
-  document.execCommand(
-    'copy'
+  const copied = document.execCommand('copy');
+
+  if (!copied) {
+    throw new Error('Clipboard copy was rejected.');
+  }
+
+  const originalText = elements.copyButton.textContent;
+
+  elements.copyButton.textContent = 'Copied';
+
+  window.setTimeout(() => {
+    elements.copyButton.textContent = originalText;
+  }, 1500);
+
+} catch (fallbackError) {
+  showError(
+    fallbackError instanceof Error
+      ? fallbackError.message
+      : String(fallbackError)
   );
-
-statusMessage.textContent =
-  copied
-    ? 'Sanitized output copied to the clipboard.'
-    : 'Clipboard access was not available. Select and copy the output manually.';
+}
 ```
 
 }
 }
 
 function downloadOutput() {
-if (!lastOutput) {
+const output = elements.outputText.value;
+
+if (!output) {
 return;
 }
 
-const blob =
-new Blob(
-[lastOutput],
+const filename = createOutputFilename(
+currentInputFileName
+);
+
+const blob = new Blob(
+[output],
 {
 type: 'text/plain;charset=utf-8'
 }
 );
 
-const url =
-URL.createObjectURL(
-blob
-);
+const url = URL.createObjectURL(blob);
 
-const anchor =
-document.createElement(
-'a'
-);
+const link = document.createElement('a');
 
-anchor.href = url;
-anchor.download =
-selectedFileName;
+link.href = url;
+link.download = filename;
+link.rel = 'noopener';
 
-document.body.append(
-anchor
-);
+document.body.appendChild(link);
+link.click();
+link.remove();
 
-anchor.click();
-
-anchor.remove();
-
-URL.revokeObjectURL(
-url
-);
-
-statusMessage.textContent =
-'Sanitized output downloaded locally.';
+URL.revokeObjectURL(url);
 }
 
-function getUtf8ByteLength(text) {
-return new TextEncoder()
-.encode(
-String(text ?? '')
-)
-.byteLength;
+function createOutputFilename(originalName) {
+if (!originalName) {
+return 'sanitized-output.txt';
 }
 
-function formatBytes(bytes) {
-if (!Number.isFinite(bytes)) {
-return '0 B';
+const lastDot = originalName.lastIndexOf('.');
+
+if (lastDot <= 0) {
+return `${originalName}-sanitized.txt`;
 }
 
-if (bytes < 1024) {
-return `${bytes} B`;
-}
-
-if (bytes < 1024 * 1024) {
-return `${(
-      bytes / 1024
-    ).toFixed(1)} KB`;
-}
-
-if (bytes < 1024 * 1024 * 1024) {
-return `${(
-      bytes /
-      (1024 * 1024)
-    ).toFixed(1)} MB`;
-}
-
-return `${(
-    bytes /
-    (1024 * 1024 * 1024)
-  ).toFixed(1)} GB`;
-}
-
-function buildOutputFileName(
-fileName
-) {
-const dotIndex =
-fileName.lastIndexOf('.');
-
-if (
-dotIndex <= 0
-) {
-return `${fileName}-sanitized.txt`;
-}
-
-const base =
-fileName.slice(
-0,
-dotIndex
-);
-
-const extension =
-fileName.slice(
-dotIndex
-);
+const base = originalName.slice(0, lastDot);
+const extension = originalName.slice(lastDot);
 
 return `${base}-sanitized${extension}`;
 }
 
-inputElement.addEventListener(
-'input',
-updateInputSize
-);
+function clearAll() {
+currentRunId++;
 
-clearButton.addEventListener(
-'click',
-clearInput
-);
-
-sanitizeButton.addEventListener(
-'click',
-sanitize
-);
-
-fileInput.addEventListener(
-'change',
-loadFile
-);
-
-copyButton.addEventListener(
-'click',
-copyOutput
-);
-
-downloadButton.addEventListener(
-'click',
-downloadOutput
-);
-
-window.addEventListener(
-'beforeunload',
-() => {
 terminateWorker();
-}
-);
+
+isProcessing = false;
+currentInputFileName = null;
+
+elements.inputText.value = '';
+elements.fileInput.value = '';
+
+resetOutput();
+hideError();
+
+elements.sanitizeButton.disabled = false;
+elements.clearButton.disabled = false;
+elements.fileInput.disabled = false;
+elements.profileSelect.disabled = false;
+elements.strictMode.disabled = false;
 
 updateInputSize();
+
+setStatus('Ready', 0);
+
+elements.inputText.focus();
+}
+
+function resetOutput() {
+elements.outputText.value = '';
+
+elements.outputSize.textContent = '0 B';
+elements.outputStatus.textContent = 'No output generated';
+
+elements.statsInputSize.textContent =
+formatBytes(
+utf8ByteLength(elements.inputText.value)
+);
+
+elements.statsOutputSize.textContent = '0 B';
+
+elements.rulesMatched.textContent = '0';
+elements.totalMatches.textContent = '0';
+
+elements.matchedRulesList.replaceChildren();
+elements.matchedRules.hidden = true;
+
+elements.copyButton.disabled = true;
+elements.downloadButton.disabled = true;
+}
+
+function updateOutputState() {
+const hasOutput =
+elements.outputText.value.length > 0;
+
+elements.copyButton.disabled = !hasOutput;
+elements.downloadButton.disabled = !hasOutput;
+}
+
+function updateInputSize() {
+const size = utf8ByteLength(
+elements.inputText.value
+);
+
+elements.inputSize.textContent =
+formatBytes(size);
+
+elements.statsInputSize.textContent =
+formatBytes(size);
+}
+
+function setStatus(status, percent) {
+const safePercent = Math.max(
+0,
+Math.min(
+100,
+Number.isFinite(Number(percent))
+? Math.floor(Number(percent))
+: 0
+)
+);
+
+elements.statusText.textContent = status;
+elements.progressPercent.textContent = `${safePercent}%`;
+
+elements.progressBar.style.width =
+`${safePercent}%`;
+
+elements.progressBar.setAttribute(
+'aria-valuenow',
+String(safePercent)
+);
+}
+
+function showError(message) {
+elements.errorText.textContent =
+String(message || 'An unknown error occurred.');
+
+elements.errorPanel.hidden = false;
+}
+
+function hideError() {
+elements.errorPanel.hidden = true;
+elements.errorText.textContent = '';
+}
+
+function normalizeStats(stats) {
+if (!stats || typeof stats !== 'object') {
+return {
+matches: {}
+};
+}
+
+return {
+matches:
+stats.matches &&
+typeof stats.matches === 'object'
+? stats.matches
+: {}
+};
+}
+
+function normalizeCount(value) {
+const number = Number(value);
+
+if (!Number.isFinite(number) || number < 0) {
+return 0;
+}
+
+return Math.floor(number);
+}
+
+function utf8ByteLength(value) {
+return new TextEncoder()
+.encode(String(value ?? ''))
+.byteLength;
+}
+
+function formatBytes(bytes) {
+const value = Number(bytes);
+
+if (!Number.isFinite(value) || value <= 0) {
+return '0 B';
+}
+
+const units = [
+'B',
+'KB',
+'MB',
+'GB'
+];
+
+let size = value;
+let unitIndex = 0;
+
+while (
+size >= 1024 &&
+unitIndex < units.length - 1
+) {
+size /= 1024;
+unitIndex++;
+}
+
+if (unitIndex === 0) {
+return `${Math.round(size)} B`;
+}
+
+return `${size.toFixed(size >= 10 ? 0 : 1)} ${units[unitIndex]}`;
+}
+
+function terminateWorker() {
+if (!worker) {
+return;
+}
+
+try {
+worker.terminate();
+} catch {
+// Worker termination is best-effort.
+}
+
+worker = null;
+}
