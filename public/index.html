@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+
+<meta
+name="viewport"
+content="width=device-width, initial-scale=1.0"
+
+>
+
+<meta
+name="description"
+content="SanitizeLog is a privacy-focused client-side diagnostic log sanitizer. Sanitize sensitive values directly in your browser without uploading your logs."
+
+>
+
+<meta
+name="robots"
+content="index,follow"
+
+>
+
+  <title>SanitizeLog | Privacy-Focused Diagnostic Log Sanitizer</title>
+
+  <link
+    rel="stylesheet"
+    href="./styles.css"
+  >
+</head>
+
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <div>
+        <a
+          class="brand"
+          href="./"
+          aria-label="SanitizeLog home"
+        >
+          SanitizeLog
+        </a>
+
+```
+    <p class="brand-subtitle">
+      Privacy-focused diagnostic log sanitizer
+    </p>
+  </div>
+
+  <div class="privacy-badge">
+    Client-side processing
+  </div>
+</div>
+```
+
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">NO UPLOAD REQUIRED</p>
+
+```
+    <h1>
+      Sanitize sensitive diagnostic logs in your browser.
+    </h1>
+
+    <p class="hero-description">
+      Detect and replace sensitive values locally using deterministic
+      tokens. Your diagnostic content stays in the browser.
+    </p>
+  </div>
+</section>
+
+<section class="security-notice" aria-label="Privacy information">
+  <strong>Privacy first</strong>
+  <span>
+    Sanitization runs locally in a Web Worker. This page does not
+    require an account or server-side log processing.
+  </span>
+</section>
+
+<section class="workspace">
+  <div class="panel input-panel">
+    <div class="panel-header">
+      <div>
+        <h2>Input</h2>
+        <p>Paste diagnostic output below.</p>
+      </div>
+
+      <label
+        class="file-button"
+        for="file-input"
+      >
+        Open file
+      </label>
+
+      <input
+        id="file-input"
+        type="file"
+        hidden
+        accept=".txt,.log,.cfg,.conf,.config,.out,.dump,.json,.yaml,.yml,.xml,.ini,.pem"
+      >
+    </div>
+
+    <textarea
+      id="input"
+      class="log-editor"
+      spellcheck="false"
+      autocomplete="off"
+      autocapitalize="off"
+      placeholder="Paste diagnostic logs here..."
+      aria-label="Diagnostic log input"
+    ></textarea>
+
+    <div class="editor-footer">
+      <span id="input-size">0 bytes</span>
+
+      <button
+        id="clear-button"
+        class="button button-secondary"
+        type="button"
+      >
+        Clear
+      </button>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="profile-control">
+      <label for="profile-select">Security profile</label>
+
+      <select id="profile-select">
+        <option value="DEFAULT_SECURITY">
+          Default Security Baseline
+        </option>
+      </select>
+    </div>
+
+    <label class="strict-control">
+      <input
+        id="strict-mode"
+        type="checkbox"
+      >
+
+      <span>
+        <strong>Strict mode</strong>
+        <small>
+          Fail if a block remains unterminated at EOF.
+        </small>
+      </span>
+    </label>
+
+    <button
+      id="sanitize-button"
+      class="button button-primary"
+      type="button"
+    >
+      Sanitize Logs
+    </button>
+  </div>
+
+  <div
+    id="status-panel"
+    class="status-panel"
+    aria-live="polite"
+  >
+    <div class="status-row">
+      <span id="status-label">Ready</span>
+      <span id="progress-label">0%</span>
+    </div>
+
+    <div class="progress-track">
+      <div
+        id="progress-bar"
+        class="progress-bar"
+        role="progressbar"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      ></div>
+    </div>
+
+    <p id="status-message">
+      Add diagnostic content and start sanitization.
+    </p>
+  </div>
+
+  <div class="panel output-panel">
+    <div class="panel-header">
+      <div>
+        <h2>Sanitized output</h2>
+        <p>Sensitive values are replaced with deterministic tokens.</p>
+      </div>
+
+      <button
+        id="download-button"
+        class="button button-secondary"
+        type="button"
+        disabled
+      >
+        Download
+      </button>
+    </div>
+
+    <textarea
+      id="output"
+      class="log-editor"
+      readonly
+      spellcheck="false"
+      aria-label="Sanitized diagnostic log output"
+      placeholder="Sanitized output will appear here..."
+    ></textarea>
+
+    <div class="editor-footer">
+      <span id="output-size">0 bytes</span>
+
+      <button
+        id="copy-button"
+        class="button button-secondary"
+        type="button"
+        disabled
+      >
+        Copy
+      </button>
+    </div>
+  </div>
+</section>
+
+<section class="results" aria-labelledby="results-heading">
+  <div class="section-heading">
+    <h2 id="results-heading">Sanitization results</h2>
+    <p>Detection statistics from the current operation.</p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <span class="stat-label">Rules matched</span>
+      <strong id="rules-matched">0</strong>
+    </div>
+
+    <div class="stat-card">
+      <span class="stat-label">Total matches</span>
+      <strong id="total-matches">0</strong>
+    </div>
+
+    <div class="stat-card">
+      <span class="stat-label">Input size</span>
+      <strong id="result-input-size">0 B</strong>
+    </div>
+
+    <div class="stat-card">
+      <span class="stat-label">Output size</span>
+      <strong id="result-output-size">0 B</strong>
+    </div>
+  </div>
+
+  <div class="match-list-container">
+    <h3>Matched rules</h3>
+
+    <div
+      id="match-list"
+      class="match-list empty"
+    >
+      No rules have matched yet.
+    </div>
+  </div>
+</section>
+
+<section class="how-it-works">
+  <div class="section-heading">
+    <h2>How it works</h2>
+  </div>
+
+  <div class="steps">
+    <article class="step">
+      <span class="step-number">1</span>
+      <h3>Load your logs</h3>
+      <p>
+        Paste diagnostic content or open a supported local file.
+      </p>
+    </article>
+
+    <article class="step">
+      <span class="step-number">2</span>
+      <h3>Sanitize locally</h3>
+      <p>
+        The browser Web Worker applies the configured security rules.
+      </p>
+    </article>
+
+    <article class="step">
+      <span class="step-number">3</span>
+      <h3>Use the result</h3>
+      <p>
+        Copy or download the sanitized diagnostic output.
+      </p>
+    </article>
+  </div>
+</section>
+```
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>SanitizeLog</span>
+
+```
+  <span>
+    Client-side diagnostic sanitization
+  </span>
+</div>
+```
+
+  </footer>
+
+  <script
+    type="module"
+    src="./app.js"
+  ></script>
+
+</body>
+</html>
