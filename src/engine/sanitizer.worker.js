@@ -2,263 +2,772 @@ import { TypeAwareTokenMap } from './token-map.js';
 import { applyReplacement } from './replacement.js';
 import { validateRules } from './rule-validator.js';
 
-const DEFAULT_MAX_BLOCK_BYTES = 1048576; // 1 MB default
+const MAX_FILE_BYTES = 500 * 1024 * 1024;
+const DEFAULT_MAX_BLOCK_BYTES = 1048576;
+const STREAM_CHUNK_TARGET_BYTES = 64 * 1024;
 
 let currentAbortController = null;
 
 self.onmessage = async (event) => {
-  const { data, postMessage } = parseWorkerEvent(event);
+const { data, postMessage } = parseWorkerEvent(event);
 
-  if (!data || !data.type) return;
+if (!data || !data.type) {
+return;
+}
 
-  if (data.type === 'CANCEL') {
-    if (currentAbortController) {
-      currentAbortController.abort();
-    }
-    return;
-  }
+if (data.type === 'CANCEL') {
+if (currentAbortController) {
+currentAbortController.abort();
+}
+return;
+}
 
-  if (data.type === 'START') {
-    currentAbortController = new AbortController();
-    const signal = currentAbortController.signal;
+if (data.type !== 'START') {
+dispatchMessage(postMessage, {
+type: 'ERROR',
+error: `Unsupported worker message type '${data.type}'.`
+});
+return;
+}
 
-    try {
-      const { content, rules, options = {} } = data.payload || {};
-      validateRules(rules);
+currentAbortController = new AbortController();
+const signal = currentAbortController.signal;
 
-      const tokenMap = new TypeAwareTokenMap(options.tokenMapState);
-      const stats = { matches: {} };
+try {
+const { content, rules, options = {} } = data.payload || {};
 
-      const isBlobInput = typeof Blob !== 'undefined' && content instanceof Blob;
-      const textInput = isBlobInput ? await content.text() : String(content ?? '');
-      const totalBytes = new TextEncoder().encode(textInput).byteLength;
+```
+validateRules(rules);
 
-      if (totalBytes === 0) {
-        dispatchMessage(postMessage, {
-          type: 'PROGRESS',
-          payload: { processedBytes: 0, totalBytes: 0, percent: 100 }
-        });
+const tokenMap = new TypeAwareTokenMap(options.tokenMapState);
+const stats = { matches: {} };
 
-        if (isBlobInput) {
-          dispatchMessage(postMessage, {
-            type: 'COMPLETE_BLOB',
-            payload: { blob: new Blob([''], { type: content.type || 'text/plain' }), stats }
-          });
-        } else {
-          dispatchMessage(postMessage, {
-            type: 'COMPLETE',
-            payload: { sanitizedText: '', stats }
-          });
-        }
-        return;
-      }
+const isBlobInput =
+  typeof Blob !== 'undefined' &&
+  content instanceof Blob;
 
-      const lineRules = rules.filter((r) => r.scope !== 'block');
-      const blockRules = rules.filter((r) => r.scope === 'block');
+if (isBlobInput) {
+  await processBlobContent({
+    blob: content,
+    rules,
+    options,
+    tokenMap,
+    stats,
+    signal,
+    postMessage
+  });
+} else {
+  const textInput = String(content ?? '');
 
-      const sanitizedText = await processContent({
-        textInput,
-        totalBytes,
-        lineRules,
-        blockRules,
-        tokenMap,
-        stats,
-        strict: Boolean(options.strict),
-        signal,
-        postMessage
-      });
+  await processTextContent({
+    textInput,
+    rules,
+    options,
+    tokenMap,
+    stats,
+    signal,
+    postMessage
+  });
+}
+```
 
-      if (signal.aborted) {
-        dispatchMessage(postMessage, { type: 'CANCELLED' });
-        return;
-      }
-
-      if (isBlobInput) {
-        const outputBlob = new Blob([sanitizedText], { type: content.type || 'text/plain' });
-        dispatchMessage(postMessage, {
-          type: 'COMPLETE_BLOB',
-          payload: { blob: outputBlob, stats }
-        });
-      } else {
-        dispatchMessage(postMessage, {
-          type: 'COMPLETE',
-          payload: { sanitizedText, stats }
-        });
-      }
-    } catch (err) {
-      if (signal.aborted) {
-        dispatchMessage(postMessage, { type: 'CANCELLED' });
-      } else {
-        dispatchMessage(postMessage, {
-          type: 'ERROR',
-          error: err instanceof Error ? err.message : String(err)
-        });
-      }
-    } finally {
-      currentAbortController = null;
-    }
-  }
+} catch (err) {
+if (signal.aborted) {
+dispatchMessage(postMessage, {
+type: 'CANCELLED'
+});
+} else {
+dispatchMessage(postMessage, {
+type: 'ERROR',
+error: err instanceof Error ? err.message : String(err)
+});
+}
+} finally {
+currentAbortController = null;
+}
 };
 
 function parseWorkerEvent(event) {
-  const data = event.data || event;
-  const postMessage = event.postMessage 
-    ? event.postMessage 
-    : (msg) => self.postMessage(msg);
-  return { data, postMessage };
+const data = event.data || event;
+
+const postMessage = event.postMessage
+? event.postMessage
+: (message) => self.postMessage(message);
+
+return {
+data,
+postMessage
+};
 }
 
 function dispatchMessage(postFn, message) {
-  postFn(message);
+postFn(message);
 }
 
-async function processContent({
-  textInput,
-  totalBytes,
-  lineRules,
-  blockRules,
-  tokenMap,
-  stats,
-  strict,
-  signal,
-  postMessage
+async function processBlobContent({
+blob,
+rules,
+options,
+tokenMap,
+stats,
+signal,
+postMessage
 }) {
-  const lines = splitLinesWithEndings(textInput);
-  const outputLines = [];
-  let processedBytes = 0;
+if (blob.size > MAX_FILE_BYTES) {
+throw new Error(
+`Input file exceeds the maximum supported size of ${formatMB(MAX_FILE_BYTES)}.`
+);
+}
 
-  let activeBlockRule = null;
-  let activeBlockBuffer = '';
-  let activeBlockBytes = 0;
+if (blob.size === 0) {
+dispatchMessage(postMessage, {
+type: 'PROGRESS',
+payload: {
+processedBytes: 0,
+totalBytes: 0,
+percent: 100
+}
+});
 
-  for (let i = 0; i < lines.length; i++) {
+```
+dispatchMessage(postMessage, {
+  type: 'COMPLETE_BLOB',
+  payload: {
+    blob: new Blob([''], {
+      type: blob.type || 'text/plain'
+    }),
+    stats
+  }
+});
+
+return;
+```
+
+}
+
+if (
+typeof blob.stream !== 'function' ||
+typeof TextDecoderStream === 'undefined'
+) {
+throw new Error(
+'This browser does not support the streaming APIs required for large-file sanitization.'
+);
+}
+
+const lineRules = rules.filter(
+(rule) => (rule.scope ?? 'line') !== 'block'
+);
+
+const blockRules = rules.filter(
+(rule) => rule.scope === 'block'
+);
+
+const outputChunks = [];
+
+const reader = blob
+.stream()
+.pipeThrough(new TextDecoderStream('utf-8'))
+.getReader();
+
+let processedBytes = 0;
+let textBuffer = '';
+
+let activeBlockRule = null;
+let activeBlockBuffer = '';
+let activeBlockBytes = 0;
+
+try {
+while (true) {
+if (signal.aborted) {
+throw new Error('Operation cancelled');
+}
+
+```
+  const { value, done } = await reader.read();
+
+  if (done) {
+    break;
+  }
+
+  if (typeof value !== 'string') {
+    throw new Error('Streaming decoder returned invalid text data.');
+  }
+
+  textBuffer += value;
+
+  const encodedChunkBytes =
+    new TextEncoder().encode(value).byteLength;
+
+  processedBytes += encodedChunkBytes;
+
+  const completeLines = extractCompleteLines(textBuffer);
+
+  textBuffer = completeLines.remaining;
+
+  for (const line of completeLines.lines) {
     if (signal.aborted) {
       throw new Error('Operation cancelled');
     }
 
-    const { rawLine, lineEnding } = lines[i];
-    const lineByteCount = new TextEncoder().encode(rawLine + lineEnding).byteLength;
+    const output = processLine(
+      line.rawLine,
+      line.lineEnding,
+      lineRules,
+      blockRules,
+      {
+        activeBlockRule,
+        activeBlockBuffer,
+        activeBlockBytes
+      },
+      tokenMap,
+      stats,
+      Boolean(options.strict)
+    );
 
-    if (activeBlockRule) {
-      const maxAllowedBytes = activeBlockRule.maxBytes ?? DEFAULT_MAX_BLOCK_BYTES;
-      activeBlockBytes += lineByteCount;
+    activeBlockRule = output.activeBlockRule;
+    activeBlockBuffer = output.activeBlockBuffer;
+    activeBlockBytes = output.activeBlockBytes;
 
-      if (activeBlockBytes > maxAllowedBytes) {
-        throw new Error(
-          `Rule '${activeBlockRule.id}' exceeded maxBytes limit of ${maxAllowedBytes} bytes.`
-        );
-      }
-
-      activeBlockBuffer += rawLine + lineEnding;
-
-      if (activeBlockRule.endRegex.test(rawLine)) {
-        const redactedBlock = applyBlockReplacement(
-          activeBlockRule,
-          activeBlockBuffer,
-          tokenMap,
-          stats
-        );
-        outputLines.push(redactedBlock);
-
-        activeBlockRule = null;
-        activeBlockBuffer = '';
-        activeBlockBytes = 0;
-      }
-    } else {
-      let startedBlock = false;
-      for (const blockRule of blockRules) {
-        if (blockRule.startRegex.test(rawLine)) {
-          activeBlockRule = blockRule;
-          activeBlockBuffer = rawLine + lineEnding;
-          activeBlockBytes = lineByteCount;
-          const maxAllowedBytes = blockRule.maxBytes ?? DEFAULT_MAX_BLOCK_BYTES;
-
-          if (activeBlockBytes > maxAllowedBytes) {
-            throw new Error(
-              `Rule '${blockRule.id}' exceeded maxBytes limit of ${maxAllowedBytes} bytes.`
-            );
-          }
-
-          if (blockRule.endRegex.test(rawLine)) {
-            const redactedBlock = applyBlockReplacement(
-              blockRule,
-              activeBlockBuffer,
-              tokenMap,
-              stats
-            );
-            outputLines.push(redactedBlock);
-
-            activeBlockRule = null;
-            activeBlockBuffer = '';
-            activeBlockBytes = 0;
-          }
-
-          startedBlock = true;
-          break;
-        }
-      }
-
-      if (!startedBlock) {
-        let currentLine = rawLine;
-        for (const rule of lineRules) {
-          currentLine = executeLineRule(rule, currentLine, tokenMap, stats);
-        }
-        outputLines.push(currentLine + lineEnding);
-      }
-    }
-
-    processedBytes += lineByteCount;
-    const percent = Math.min(100, Math.floor((processedBytes / totalBytes) * 100));
-
-    dispatchMessage(postMessage, {
-      type: 'PROGRESS',
-      payload: { processedBytes, totalBytes, percent }
-    });
-  }
-
-  if (activeBlockRule) {
-    if (strict) {
-      throw new Error(`Unterminated block detected for rule '${activeBlockRule.id}' at EOF.`);
-    } else {
-      outputLines.push(activeBlockBuffer);
+    if (output.output !== null) {
+      outputChunks.push(output.output);
     }
   }
 
-  return outputLines.join('');
+  dispatchProgress(
+    postMessage,
+    processedBytes,
+    blob.size
+  );
 }
 
-function executeLineRule(rule, text, tokenMap, stats) {
-  const regex = new RegExp(rule.regex.source, rule.regex.flags);
-  return text.replace(regex, (...args) => {
-    const match = args[0];
-    const captureGroups = args.slice(1, args.length - 2).map((g) => (g === undefined ? '' : g));
-    return applyReplacement(rule, match, captureGroups, tokenMap, stats);
+if (textBuffer.length > 0) {
+  const finalLine = {
+    rawLine: textBuffer,
+    lineEnding: ''
+  };
+
+  const output = processLine(
+    finalLine.rawLine,
+    finalLine.lineEnding,
+    lineRules,
+    blockRules,
+    {
+      activeBlockRule,
+      activeBlockBuffer,
+      activeBlockBytes
+    },
+    tokenMap,
+    stats,
+    Boolean(options.strict)
+  );
+
+  activeBlockRule = output.activeBlockRule;
+  activeBlockBuffer = output.activeBlockBuffer;
+  activeBlockBytes = output.activeBlockBytes;
+
+  if (output.output !== null) {
+    outputChunks.push(output.output);
+  }
+}
+
+if (activeBlockRule) {
+  if (options.strict) {
+    throw new Error(
+      `Unterminated block detected for rule '${activeBlockRule.id}' at EOF.`
+    );
+  }
+
+  outputChunks.push(activeBlockBuffer);
+}
+
+if (signal.aborted) {
+  throw new Error('Operation cancelled');
+}
+
+const outputBlob = new Blob(outputChunks, {
+  type: blob.type || 'text/plain'
+});
+
+dispatchMessage(postMessage, {
+  type: 'PROGRESS',
+  payload: {
+    processedBytes: blob.size,
+    totalBytes: blob.size,
+    percent: 100
+  }
+});
+
+dispatchMessage(postMessage, {
+  type: 'COMPLETE_BLOB',
+  payload: {
+    blob: outputBlob,
+    stats
+  }
+});
+```
+
+} finally {
+try {
+await reader.cancel();
+} catch {
+// Reader cancellation is best-effort during cleanup.
+}
+}
+}
+
+async function processTextContent({
+textInput,
+rules,
+options,
+tokenMap,
+stats,
+signal,
+postMessage
+}) {
+const totalBytes = new TextEncoder()
+.encode(textInput)
+.byteLength;
+
+if (totalBytes === 0) {
+dispatchMessage(postMessage, {
+type: 'PROGRESS',
+payload: {
+processedBytes: 0,
+totalBytes: 0,
+percent: 100
+}
+});
+
+```
+dispatchMessage(postMessage, {
+  type: 'COMPLETE',
+  payload: {
+    sanitizedText: '',
+    stats
+  }
+});
+
+return;
+```
+
+}
+
+const lineRules = rules.filter(
+(rule) => (rule.scope ?? 'line') !== 'block'
+);
+
+const blockRules = rules.filter(
+(rule) => rule.scope === 'block'
+);
+
+const sanitizedText = await processContent({
+textInput,
+totalBytes,
+lineRules,
+blockRules,
+tokenMap,
+stats,
+strict: Boolean(options.strict),
+signal,
+postMessage
+});
+
+if (signal.aborted) {
+dispatchMessage(postMessage, {
+type: 'CANCELLED'
+});
+return;
+}
+
+dispatchMessage(postMessage, {
+type: 'COMPLETE',
+payload: {
+sanitizedText,
+stats
+}
+});
+}
+
+async function processContent({
+textInput,
+totalBytes,
+lineRules,
+blockRules,
+tokenMap,
+stats,
+strict,
+signal,
+postMessage
+}) {
+const lines = splitLinesWithEndings(textInput);
+const outputLines = [];
+
+let processedBytes = 0;
+
+let activeBlockRule = null;
+let activeBlockBuffer = '';
+let activeBlockBytes = 0;
+
+for (const line of lines) {
+if (signal.aborted) {
+throw new Error('Operation cancelled');
+}
+
+```
+const lineByteCount = new TextEncoder()
+  .encode(line.rawLine + line.lineEnding)
+  .byteLength;
+
+const result = processLine(
+  line.rawLine,
+  line.lineEnding,
+  lineRules,
+  blockRules,
+  {
+    activeBlockRule,
+    activeBlockBuffer,
+    activeBlockBytes
+  },
+  tokenMap,
+  stats,
+  strict
+);
+
+activeBlockRule = result.activeBlockRule;
+activeBlockBuffer = result.activeBlockBuffer;
+activeBlockBytes = result.activeBlockBytes;
+
+if (result.output !== null) {
+  outputLines.push(result.output);
+}
+
+processedBytes += lineByteCount;
+
+dispatchProgress(
+  postMessage,
+  processedBytes,
+  totalBytes
+);
+```
+
+}
+
+if (activeBlockRule) {
+if (strict) {
+throw new Error(
+`Unterminated block detected for rule '${activeBlockRule.id}' at EOF.`
+);
+}
+
+```
+outputLines.push(activeBlockBuffer);
+```
+
+}
+
+return outputLines.join('');
+}
+
+function processLine(
+rawLine,
+lineEnding,
+lineRules,
+blockRules,
+blockState,
+tokenMap,
+stats,
+strict
+) {
+let {
+activeBlockRule,
+activeBlockBuffer,
+activeBlockBytes
+} = blockState;
+
+const lineByteCount = new TextEncoder()
+.encode(rawLine + lineEnding)
+.byteLength;
+
+if (activeBlockRule) {
+const maxAllowedBytes =
+activeBlockRule.maxBytes ??
+DEFAULT_MAX_BLOCK_BYTES;
+
+```
+activeBlockBytes += lineByteCount;
+
+if (activeBlockBytes > maxAllowedBytes) {
+  throw new Error(
+    `Rule '${activeBlockRule.id}' exceeded maxBytes limit of ${maxAllowedBytes} bytes.`
+  );
+}
+
+activeBlockBuffer += rawLine + lineEnding;
+
+if (testRegex(activeBlockRule.endRegex, rawLine)) {
+  const redactedBlock = applyBlockReplacement(
+    activeBlockRule,
+    activeBlockBuffer,
+    tokenMap,
+    stats
+  );
+
+  return {
+    output: redactedBlock,
+    activeBlockRule: null,
+    activeBlockBuffer: '',
+    activeBlockBytes: 0
+  };
+}
+
+return {
+  output: null,
+  activeBlockRule,
+  activeBlockBuffer,
+  activeBlockBytes
+};
+```
+
+}
+
+for (const blockRule of blockRules) {
+if (!testRegex(blockRule.startRegex, rawLine)) {
+continue;
+}
+
+```
+activeBlockRule = blockRule;
+activeBlockBuffer = rawLine + lineEnding;
+activeBlockBytes = lineByteCount;
+
+const maxAllowedBytes =
+  blockRule.maxBytes ??
+  DEFAULT_MAX_BLOCK_BYTES;
+
+if (activeBlockBytes > maxAllowedBytes) {
+  throw new Error(
+    `Rule '${blockRule.id}' exceeded maxBytes limit of ${maxAllowedBytes} bytes.`
+  );
+}
+
+if (testRegex(blockRule.endRegex, rawLine)) {
+  const redactedBlock = applyBlockReplacement(
+    blockRule,
+    activeBlockBuffer,
+    tokenMap,
+    stats
+  );
+
+  return {
+    output: redactedBlock,
+    activeBlockRule: null,
+    activeBlockBuffer: '',
+    activeBlockBytes: 0
+  };
+}
+
+return {
+  output: null,
+  activeBlockRule,
+  activeBlockBuffer,
+  activeBlockBytes
+};
+```
+
+}
+
+let currentLine = rawLine;
+
+for (const rule of lineRules) {
+currentLine = executeLineRule(
+rule,
+currentLine,
+tokenMap,
+stats
+);
+}
+
+return {
+output: currentLine + lineEnding,
+activeBlockRule: null,
+activeBlockBuffer: '',
+activeBlockBytes: 0
+};
+}
+
+function executeLineRule(
+rule,
+text,
+tokenMap,
+stats
+) {
+const regex = new RegExp(
+rule.regex.source,
+rule.regex.flags
+);
+
+return text.replace(
+regex,
+(...args) => {
+const match = args[0];
+
+```
+  const captureGroups = args
+    .slice(1, args.length - 2)
+    .map((group) =>
+      group === undefined ? '' : group
+    );
+
+  return applyReplacement(
+    rule,
+    match,
+    captureGroups,
+    tokenMap,
+    stats
+  );
+}
+```
+
+);
+}
+
+function applyBlockReplacement(
+rule,
+blockBuffer,
+tokenMap,
+stats
+) {
+return applyReplacement(
+rule,
+blockBuffer,
+[],
+tokenMap,
+stats
+);
+}
+
+function testRegex(regex, value) {
+const safeRegex = new RegExp(
+regex.source,
+regex.flags
+);
+
+safeRegex.lastIndex = 0;
+
+return safeRegex.test(value);
+}
+
+function extractCompleteLines(buffer) {
+const lines = [];
+
+let start = 0;
+
+for (let i = 0; i < buffer.length; i++) {
+const char = buffer[i];
+
+```
+if (char === '\n') {
+  lines.push({
+    rawLine: buffer.slice(start, i),
+    lineEnding: '\n'
   });
+
+  start = i + 1;
+  continue;
 }
 
-function applyBlockReplacement(rule, blockBuffer, tokenMap, stats) {
-  return applyReplacement(rule, blockBuffer, [], tokenMap, stats);
+if (char === '\r') {
+  if (
+    i + 1 < buffer.length &&
+    buffer[i + 1] === '\n'
+  ) {
+    lines.push({
+      rawLine: buffer.slice(start, i),
+      lineEnding: '\r\n'
+    });
+
+    i++;
+    start = i + 1;
+  } else {
+    lines.push({
+      rawLine: buffer.slice(start, i),
+      lineEnding: '\r'
+    });
+
+    start = i + 1;
+  }
+}
+```
+
+}
+
+return {
+lines,
+remaining: buffer.slice(start)
+};
 }
 
 function splitLinesWithEndings(text) {
-  const result = [];
-  const regex = /([^\r\n]*)(\r\n|\n|\r)?/g;
-  let match;
+const result = [];
+const regex = /([^\r\n]*)(\r\n|\n|\r)?/g;
 
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index === regex.lastIndex) {
-      regex.lastIndex++;
-    }
+let match;
 
-    const rawLine = match[1] || '';
-    const lineEnding = match[2] || '';
+while ((match = regex.exec(text)) !== null) {
+if (
+match.index === regex.lastIndex
+) {
+regex.lastIndex++;
+}
 
-    if (rawLine === '' && lineEnding === '' && match.index === text.length) {
-      break;
-    }
+```
+const rawLine = match[1] || '';
+const lineEnding = match[2] || '';
 
-    result.push({ rawLine, lineEnding });
-  }
+if (
+  rawLine === '' &&
+  lineEnding === '' &&
+  match.index === text.length
+) {
+  break;
+}
 
-  return result;
+result.push({
+  rawLine,
+  lineEnding
+});
+```
+
+}
+
+return result;
+}
+
+function dispatchProgress(
+postMessage,
+processedBytes,
+totalBytes
+) {
+const percent =
+totalBytes === 0
+? 100
+: Math.min(
+100,
+Math.floor(
+(processedBytes / totalBytes) * 100
+)
+);
+
+dispatchMessage(postMessage, {
+type: 'PROGRESS',
+payload: {
+processedBytes,
+totalBytes,
+percent
+}
+});
+}
+
+function formatMB(bytes) {
+return `${Math.round(bytes / 1024 / 1024)} MB`;
 }
