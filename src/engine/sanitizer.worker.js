@@ -19,9 +19,9 @@ if (currentAbortController) {
 currentAbortController.abort();
 }
 
-```
+
 return;
-```
+
 
 }
 
@@ -31,9 +31,9 @@ type: 'ERROR',
 error: "Unsupported worker message type '" + data.type + "'."
 });
 
-```
+
 return;
-```
+
 
 }
 
@@ -44,7 +44,7 @@ const signal = currentAbortController.signal;
 try {
 const { content, rules, options = {} } = data.payload || {};
 
-```
+
 validateRules(rules);
 
 const tokenMap = new TypeAwareTokenMap(
@@ -80,7 +80,7 @@ if (isBlobInput) {
     postMessage
   });
 }
-```
+
 
 } catch (err) {
 if (signal.aborted) {
@@ -145,7 +145,7 @@ percent: 100
 }
 });
 
-```
+
 dispatchMessage(postMessage, {
   type: 'COMPLETE_BLOB',
   payload: {
@@ -157,7 +157,7 @@ dispatchMessage(postMessage, {
 });
 
 return;
-```
+
 
 }
 
@@ -202,7 +202,7 @@ await reader.cancel();
 // Best-effort stream cancellation.
 }
 
-```
+
   throw new Error('Operation cancelled');
 }
 
@@ -273,7 +273,7 @@ dispatchProgress(
   processedBytes,
   blob.size
 );
-```
+
 
 }
 
@@ -292,7 +292,7 @@ tokenMap,
 stats
 );
 
-```
+
 activeBlockRule =
   processed.activeBlockRule;
 
@@ -305,7 +305,7 @@ activeBlockBytes =
 if (processed.output !== null) {
   outputChunks.push(processed.output);
 }
-```
+
 
 }
 
@@ -318,9 +318,9 @@ activeBlockRule.id +
 );
 }
 
-```
+
 outputChunks.push(activeBlockBuffer);
-```
+
 
 }
 
@@ -377,7 +377,7 @@ percent: 100
 }
 });
 
-```
+
 dispatchMessage(postMessage, {
   type: 'COMPLETE',
   payload: {
@@ -387,7 +387,7 @@ dispatchMessage(postMessage, {
 });
 
 return;
-```
+
 
 }
 
@@ -424,9 +424,9 @@ dispatchMessage(postMessage, {
 type: 'CANCELLED'
 });
 
-```
+
 return;
-```
+
 
 }
 
@@ -466,7 +466,7 @@ if (signal.aborted) {
 throw new Error('Operation cancelled');
 }
 
-```
+
 const result = processLine(
   line.rawLine,
   line.lineEnding,
@@ -506,7 +506,7 @@ dispatchProgress(
   processedBytes,
   totalBytes
 );
-```
+
 
 }
 
@@ -519,9 +519,9 @@ activeBlockRule.id +
 );
 }
 
-```
+
 outputLines.push(activeBlockBuffer);
-```
+
 
 }
 
@@ -559,7 +559,7 @@ const maxAllowedBytes =
 activeBlockRule.maxBytes ??
 DEFAULT_MAX_BLOCK_BYTES;
 
-```
+
 activeBlockBytes +=
   lineByteCount;
 
@@ -608,7 +608,7 @@ return {
   activeBlockBuffer,
   activeBlockBytes
 };
-```
+
 
 }
 
@@ -622,7 +622,7 @@ rawLine
 continue;
 }
 
-```
+
 activeBlockRule =
   blockRule;
 
@@ -678,7 +678,7 @@ return {
   activeBlockBuffer,
   activeBlockBytes
 };
-```
+
 
 }
 
@@ -722,7 +722,7 @@ regex,
 const match =
 args[0];
 
-```
+
   const captureGroups =
     args
       .slice(1, args.length - 2)
@@ -741,7 +741,7 @@ args[0];
     stats
   );
 }
-```
+
 
 );
 }
@@ -791,7 +791,7 @@ index++
 const character =
 buffer[index];
 
-```
+
 if (character === '\n') {
   lines.push({
     rawLine:
@@ -840,7 +840,7 @@ if (character === '\r') {
       index + 1;
   }
 }
-```
+
 
 }
 
@@ -871,7 +871,7 @@ regex.lastIndex
 regex.lastIndex++;
 }
 
-```
+
 const rawLine =
   match[1] || '';
 
@@ -890,7 +890,7 @@ result.push({
   rawLine,
   lineEnding
 });
-```
+
 
 }
 
