@@ -1,344 +1,613 @@
-<!DOCTYPE html>
+<!doctype html>
 
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
 
-  <title>SanitizeLog | Privacy-Focused Diagnostic Log Sanitizer</title>
+<meta
+name="viewport"
+content="width=device-width, initial-scale=1, viewport-fit=cover"
+
+>
 
 <meta
 name="description"
-content="Sanitize sensitive information from diagnostic logs directly in your browser. No upload, no registration, and privacy-focused."
+content="Sanitize logs and configuration files locally in your browser. Remove sensitive tokens and passwords from diagnostic files without uploading the original file. Supports files up to 500 MB."
 
 >
 
 <meta
-name="keywords"
-content="log sanitizer, diagnostic log sanitizer, redact logs, remove secrets from logs, privacy log sanitizer, sanitize configuration files"
+name="robots"
+content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"
 
 >
 
-  <meta name="robots" content="index, follow">
-  <meta name="author" content="SanitizeLog">
+<meta
+name="theme-color"
+content="#0b1220"
 
-  <link rel="canonical" href="./">
-  <link rel="stylesheet" href="./styles.css">
+>
 
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="SanitizeLog | Privacy-Focused Diagnostic Log Sanitizer">
-  <meta
-    property="og:description"
-    content="Sanitize sensitive information from diagnostic logs directly in your browser."
+  <link
+    rel="canonical"
+    href="https://sanitizerpro.github.io/sanitizer/"
   >
-  <meta property="og:url" content="./">
 
-  <meta name="twitter:card" content="summary">
-  <meta
-    name="twitter:title"
-    content="SanitizeLog | Privacy-Focused Diagnostic Log Sanitizer"
+  <title>
+    Sanitize Logs & Configuration Files Locally | SanitizeLog
+  </title>
+
+  <link
+    rel="stylesheet"
+    href="./styles.css"
   >
-  <meta
-    name="twitter:description"
-    content="Sanitize sensitive information from diagnostic logs directly in your browser."
-  >
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "SanitizeLog",
+    "alternateName": "Sanitize Log",
+    "url": "https://sanitizerpro.github.io/sanitizer/",
+    "applicationCategory": "SecurityApplication",
+    "applicationSubCategory": "Diagnostic Log Sanitizer",
+    "operatingSystem": "Windows, macOS, Linux, Android, iOS",
+    "browserRequirements": "Requires a modern web browser with Web Worker and Blob streaming support",
+    "description": "A browser-based diagnostic log and configuration sanitizer that processes files locally and replaces supported sensitive values with deterministic security tokens.",
+    "featureList": [
+      "Client-side log sanitization",
+      "Configuration file sanitization",
+      "JWT detection",
+      "Password assignment detection",
+      "500 MB maximum input",
+      "Real-time byte-based progress",
+      "Web Worker processing",
+      "No server-side file upload",
+      "Download sanitized output"
+    ],
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    }
+  }
+  </script>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is SanitizeLog?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "SanitizeLog is a browser-based diagnostic log and configuration sanitizer. It detects supported sensitive values and replaces them with deterministic security tokens without requiring the original file to be uploaded to a server."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does SanitizeLog upload my log file?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "SanitizeLog is designed to process the selected file locally in your browser using a Web Worker. The sanitizer does not require uploading the original file to a remote processing server."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I sanitize a 500 MB log file?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "The current application supports input files up to 500 MB. Large files are processed through browser Blob streaming instead of reading the entire input with file.text()."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How is sanitization progress calculated?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Progress is calculated from bytes processed compared with the total input size. The interface displays the current percentage and processed byte count while the Web Worker processes the file."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What does SanitizeLog currently detect?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "The current security baseline includes JSON Web Token bearer patterns and generic password key-value assignments. Detection rules are profile based and can be expanded as the ruleset evolves."
+        }
+      }
+    ]
+  }
+  </script>
+
 </head>
 
 <body>
-
-  <a class="skip-link" href="#main-content">
-    Skip to main content
+  <a
+    class="skip-link"
+    href="#sanitizer-tool"
+  >
+    Skip to sanitizer
   </a>
 
   <header class="site-header">
     <div class="container header-inner">
-      
-  <div class="brand-area">
-    <a class="brand" href="./" aria-label="SanitizeLog home">
-      <span class="brand-mark" aria-hidden="true">SL</span>
-      <span>SanitizeLog</span>
-    </a>
+      <a
+        class="brand"
+        href="./"
+        aria-label="SanitizeLog home"
+      >
+        <span class="brand-mark" aria-hidden="true">
+          SL
+        </span>
 
-    <p class="brand-subtitle">
-      Privacy-focused diagnostic log sanitizer
-    </p>
-  </div>
 
-  <div class="privacy-badge" aria-label="Privacy status">
-    <span class="privacy-dot" aria-hidden="true"></span>
-    Runs locally in your browser
-  </div>
+    <span class="brand-text">
+      <strong>SanitizeLog</strong>
+      <span>Local diagnostic sanitizer</span>
+    </span>
+  </a>
 
+  <nav
+    class="main-nav"
+    aria-label="Primary navigation"
+  >
+    <a href="#sanitizer-tool">Sanitize</a>
+    <a href="#how-it-works">How it works</a>
+    <a href="#supported-formats">Formats</a>
+    <a href="#faq">FAQ</a>
+  </nav>
 </div>
 
 
   </header>
 
-  <main id="main-content">
+  <main>
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <div class="eyebrow">
+            Browser-based security utility
+          </div>
 
-
-<section class="hero">
-  <div class="container">
-
-    <div class="hero-content">
-
-      <p class="eyebrow">
-        SECURE LOG SANITIZATION
-      </p>
 
       <h1>
-        Remove sensitive data from diagnostic logs
-        <span>without uploading your files.</span>
+        Sanitize Logs & Configuration Files Locally
       </h1>
 
-      <p class="hero-description">
-        SanitizeLog detects sensitive information such as passwords,
-        authentication tokens, and other configured secrets and replaces
-        them with deterministic security tokens directly in your browser.
+      <p class="hero-lead">
+        Remove supported sensitive credentials and tokens from diagnostic
+        files directly in your browser. No signup and no server-side file
+        upload required.
       </p>
 
-      <div class="hero-points">
-
-        <div class="hero-point">
-          <strong>No upload</strong>
-          <span>
-            Your diagnostic content stays in your browser.
-          </span>
+      <div class="trust-grid">
+        <div class="trust-card">
+          <strong>500 MB</strong>
+          <span>Maximum input</span>
         </div>
 
-        <div class="hero-point">
-          <strong>No registration</strong>
-          <span>
-            No account or server-side storage is required.
-          </span>
+        <div class="trust-card">
+          <strong>Local</strong>
+          <span>Browser processing</span>
         </div>
 
-        <div class="hero-point">
-          <strong>Deterministic</strong>
-          <span>
-            Repeated values receive consistent replacement tokens.
-          </span>
+        <div class="trust-card">
+          <strong>Live</strong>
+          <span>Byte-based progress</span>
         </div>
-
       </div>
-
     </div>
 
-    <div class="privacy-card">
-
-      <div class="privacy-card-icon" aria-hidden="true">
+    <aside class="hero-summary" aria-label="SanitizeLog capabilities">
+      <div class="summary-icon" aria-hidden="true">
         ✓
       </div>
 
-      <div>
-        <strong>Privacy by design</strong>
-        <p>
-          Your diagnostic content is processed locally by your browser.
-          It is not sent to a remote sanitization server.
-        </p>
-      </div>
+      <h2>
+        Built for diagnostic data
+      </h2>
 
-    </div>
+      <p>
+        Prepare logs and configuration files for troubleshooting,
+        support cases, collaboration and incident analysis while reducing
+        accidental exposure of supported sensitive values.
+      </p>
 
+      <ul>
+        <li>Runs in a Web Worker</li>
+        <li>Streaming support for large files</li>
+        <li>Deterministic replacement tokens</li>
+        <li>Original input remains unchanged</li>
+      </ul>
+    </aside>
   </div>
 </section>
 
-<section class="sanitizer-section">
+<section
+  id="sanitizer-tool"
+  class="tool-section"
+  aria-labelledby="tool-title"
+>
   <div class="container">
+    <div class="section-heading">
+      <div>
+        <span class="section-kicker">Sanitizer</span>
 
-    <div class="sanitizer-card">
+        <h2 id="tool-title">
+          Sanitize your diagnostic file
+        </h2>
 
-      <div class="card-header">
-
-        <div>
-          <p class="eyebrow">
-            SANITIZATION WORKSPACE
-          </p>
-
-          <h2>
-            Sanitize diagnostic content
-          </h2>
-
-          <p>
-            Paste log content or load a local file to begin.
-          </p>
-        </div>
-
+        <p>
+          Choose a file or paste text. Processing starts locally when you
+          select <strong>Sanitize</strong>.
+        </p>
       </div>
 
-      <div class="input-section">
+      <div class="privacy-badge">
+        <span aria-hidden="true">●</span>
+        Local processing
+      </div>
+    </div>
 
-        <div class="section-heading">
+    <div class="tool-card">
+      <div class="input-mode-tabs" role="tablist" aria-label="Input method">
+        <button
+          id="fileModeButton"
+          class="mode-tab active"
+          type="button"
+          role="tab"
+          aria-selected="true"
+          aria-controls="fileInputPanel"
+        >
+          Upload file
+        </button>
 
-          <label for="inputText">
-            Input
-          </label>
+        <button
+          id="textModeButton"
+          class="mode-tab"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="textInputPanel"
+        >
+          Paste text
+        </button>
+      </div>
 
-          <div class="input-actions">
+      <div
+        id="fileInputPanel"
+        class="input-panel active"
+        role="tabpanel"
+        aria-labelledby="fileModeButton"
+      >
+        <label
+          id="dropZone"
+          class="drop-zone"
+          for="fileInput"
+        >
+          <input
+            id="fileInput"
+            type="file"
+            accept=".txt,.log,.conf,.cfg,.config,.out,.json,.yaml,.yml,.xml,.csv,.ini"
+          >
 
-            <label
-              class="file-button"
-              for="fileInput"
-            >
-              Load file
-            </label>
+          <span
+            class="drop-icon"
+            aria-hidden="true"
+          >
+            ↑
+          </span>
 
-            <input
-              id="fileInput"
-              type="file"
-              hidden
-              accept=".txt,.log,.conf,.cfg,.config,.out,.json,.yaml,.yml,.xml,.csv,.ini"
-            >
+          <span class="drop-title">
+            Drop your log or configuration file here
+          </span>
 
-            <button
-              id="clearButton"
-              class="secondary-button"
-              type="button"
-            >
-              Clear
-            </button>
+          <span class="drop-subtitle">
+            or choose a file from your device
+          </span>
 
+          <span class="file-button">
+            Choose file
+          </span>
+
+          <span class="drop-meta">
+            TXT · LOG · CONF · CFG · CONFIG · OUT · JSON · YAML · XML · CSV · INI
+          </span>
+
+          <span class="drop-limit">
+            Maximum input size: 500 MB
+          </span>
+        </label>
+
+        <div
+          id="selectedFile"
+          class="selected-file hidden"
+          aria-live="polite"
+        >
+          <div class="selected-file-icon" aria-hidden="true">
+            FILE
           </div>
 
+          <div class="selected-file-info">
+            <strong id="selectedFileName">
+              No file selected
+            </strong>
+
+            <span id="selectedFileSize">
+              -
+            </span>
+          </div>
+
+          <button
+            id="removeFileButton"
+            class="icon-button"
+            type="button"
+            aria-label="Remove selected file"
+            title="Remove selected file"
+          >
+            ×
+          </button>
         </div>
+      </div>
+
+      <div
+        id="textInputPanel"
+        class="input-panel"
+        role="tabpanel"
+        aria-labelledby="textModeButton"
+        hidden
+      >
+        <label
+          class="field-label"
+          for="inputText"
+        >
+          Diagnostic text
+        </label>
 
         <textarea
           id="inputText"
-          class="log-textarea"
-          rows="16"
+          class="text-input"
+          placeholder="Paste diagnostic logs or configuration content here..."
           spellcheck="false"
           autocomplete="off"
-          autocapitalize="off"
-          placeholder="Paste diagnostic logs or configuration content here..."
-          aria-label="Diagnostic log input"
         ></textarea>
 
-        <div class="input-meta">
-          <span id="inputSize">0 B</span>
-          <span>Content is processed locally</span>
-        </div>
+        <div class="field-meta">
+          <span>
+            Text is processed locally in your browser.
+          </span>
 
+          <span id="textInputSize">
+            0 B
+          </span>
+        </div>
       </div>
 
-      <div class="configuration-section">
+      <div class="options-grid">
+        <div class="field-group">
+          <label
+            class="field-label"
+            for="profileSelect"
+          >
+            Security profile
+          </label>
 
-        <div class="configuration-grid">
-
-          <div class="form-group">
-
-            <label for="profileSelect">
-              Security profile
-            </label>
-
-            <select id="profileSelect">
-              <option value="DEFAULT_SECURITY">
-                Default Security Baseline
-              </option>
-            </select>
-
-            <p class="field-help">
-              Applies the configured sanitization rules.
-            </p>
-
-          </div>
-
-          <div class="form-group strict-group">
-
-            <label class="checkbox-label">
-
-              <input
-                id="strictMode"
-                type="checkbox"
-              >
-
-              <span>
-                <strong>Strict mode</strong>
-                <small>
-                  Fail closed if a configured block is incomplete at EOF.
-                </small>
-              </span>
-
-            </label>
-
-          </div>
-
+          <select
+            id="profileSelect"
+            class="select-input"
+          ></select>
         </div>
 
-      </div>
+        <div class="field-group strict-group">
+          <label class="switch-label">
+            <input
+              id="strictMode"
+              type="checkbox"
+            >
 
-      <div class="action-section">
+            <span
+              class="switch"
+              aria-hidden="true"
+            ></span>
 
-        <button
-          id="sanitizeButton"
-          class="primary-button"
-          type="button"
-        >
-          Sanitize logs
-        </button>
-
-        <p class="action-note">
-          Processing is performed locally by a browser Web Worker.
-        </p>
-
+            <span>
+              <strong>Strict mode</strong>
+              <small>
+                Fail if a sensitive block is incomplete at EOF
+              </small>
+            </span>
+          </label>
+        </div>
       </div>
 
       <div
         id="statusPanel"
-        class="status-panel"
+        class="status-panel status-idle"
         aria-live="polite"
         aria-atomic="true"
       >
+        <div class="status-main">
+          <span
+            id="statusIndicator"
+            class="status-indicator"
+            aria-hidden="true"
+          ></span>
 
-        <div class="status-row">
+          <div>
+            <strong id="statusText">
+              Ready
+            </strong>
 
-          <span id="statusText">
-            Ready
-          </span>
-
-          <span id="progressPercent">
-            0%
-          </span>
-
+            <span id="statusMessage">
+              Select a file or paste text to begin.
+            </span>
+          </div>
         </div>
 
-        <div class="progress-track">
+        <div
+          id="progressContainer"
+          class="progress-container hidden"
+        >
+          <div class="progress-heading">
+            <span id="progressLabel">
+              Sanitizing...
+            </span>
+
+            <strong id="progressPercent">
+              0%
+            </strong>
+          </div>
 
           <div
-            id="progressBar"
-            class="progress-bar"
+            class="progress-track"
             role="progressbar"
             aria-valuemin="0"
             aria-valuemax="100"
             aria-valuenow="0"
-            style="width: 0%;"
-          ></div>
+            aria-label="Sanitization progress"
+            id="progressBar"
+          >
+            <div
+              id="progressFill"
+              class="progress-fill"
+              style="width: 0%"
+            ></div>
+          </div>
 
+          <div class="progress-details">
+            <span id="processedSize">
+              0 B processed
+            </span>
+
+            <span id="progressMatchCount">
+              0 matches
+            </span>
+          </div>
         </div>
-
       </div>
 
-      <div class="output-section">
+      <div
+        id="errorPanel"
+        class="error-panel hidden"
+        role="alert"
+      >
+        <strong id="errorTitle">
+          Sanitization failed
+        </strong>
 
-        <div class="section-heading">
+        <p id="errorText">
+          The original input was not modified.
+        </p>
+      </div>
 
+      <div class="action-row">
+        <button
+          id="clearButton"
+          class="button button-secondary"
+          type="button"
+        >
+          Clear
+        </button>
+
+        <button
+          id="cancelButton"
+          class="button button-danger hidden"
+          type="button"
+        >
+          Cancel
+        </button>
+
+        <button
+          id="sanitizeButton"
+          class="button button-primary"
+          type="button"
+        >
+          Sanitize
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section
+  id="resultSection"
+  class="result-section hidden"
+  aria-labelledby="resultTitle"
+>
+  <div class="container">
+    <div class="result-card">
+      <div class="result-header">
+        <div>
+          <span class="section-kicker">
+            Result
+          </span>
+
+          <h2 id="resultTitle">
+            Sanitization complete
+          </h2>
+
+          <p id="outputStatus">
+            Your sanitized output is ready.
+          </p>
+        </div>
+
+        <div class="success-mark" aria-hidden="true">
+          ✓
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span>Original size</span>
+          <strong id="statsInputSize">0 B</strong>
+        </div>
+
+        <div class="stat-card">
+          <span>Sanitized size</span>
+          <strong id="statsOutputSize">0 B</strong>
+        </div>
+
+        <div class="stat-card">
+          <span>Rules matched</span>
+          <strong id="rulesMatched">0</strong>
+        </div>
+
+        <div class="stat-card">
+          <span>Total replacements</span>
+          <strong id="totalMatches">0</strong>
+        </div>
+      </div>
+
+      <div class="matched-rules">
+        <h3>
+          Detection summary
+        </h3>
+
+        <ul
+          id="matchedRulesList"
+          class="matched-rules-list"
+        ></ul>
+      </div>
+
+      <div class="output-panel">
+        <div class="output-header">
           <div>
-
-            <label for="outputText">
+            <h3>
               Sanitized output
-            </label>
+            </h3>
 
-            <p class="section-description">
-              Sensitive values detected by the active rules are replaced
-              with security tokens.
-            </p>
-
+            <span id="outputPreviewNotice">
+              Preview available for smaller outputs.
+            </span>
           </div>
 
           <div class="output-actions">
-
             <button
               id="copyButton"
-              class="secondary-button"
+              class="button button-secondary button-small"
               type="button"
               disabled
             >
@@ -347,302 +616,338 @@ content="log sanitizer, diagnostic log sanitizer, redact logs, remove secrets fr
 
             <button
               id="downloadButton"
-              class="secondary-button"
+              class="button button-primary button-small"
               type="button"
               disabled
             >
               Download
             </button>
-
           </div>
-
         </div>
 
         <textarea
           id="outputText"
-          class="log-textarea output-textarea"
-          rows="16"
+          class="output-text"
           readonly
           spellcheck="false"
-          placeholder="Sanitized output will appear here..."
-          aria-label="Sanitized log output"
+          aria-label="Sanitized output"
         ></textarea>
 
-        <div class="output-meta">
-
-          <span id="outputSize">
-            0 B
-          </span>
-
-          <span id="outputStatus">
-            No output generated
-          </span>
-
-        </div>
-
-      </div>
-
-      <div
-        id="errorPanel"
-        class="error-panel"
-        role="alert"
-        hidden
-      >
-
-        <strong>
-          Sanitization failed
-        </strong>
-
-        <p id="errorText"></p>
-
-      </div>
-
-      <div class="stats-section">
-
-        <div class="stats-header">
-          <h3>
-            Sanitization statistics
-          </h3>
-        </div>
-
-        <div class="stats-grid">
-
-          <div class="stat-card">
-            <span class="stat-label">
-              Rules matched
-            </span>
-
-            <strong id="rulesMatched">
-              0
-            </strong>
-          </div>
-
-          <div class="stat-card">
-            <span class="stat-label">
-              Total matches
-            </span>
-
-            <strong id="totalMatches">
-              0
-            </strong>
-          </div>
-
-          <div class="stat-card">
-            <span class="stat-label">
-              Input size
-            </span>
-
-            <strong id="statsInputSize">
-              0 B
-            </strong>
-          </div>
-
-          <div class="stat-card">
-            <span class="stat-label">
-              Output size
-            </span>
-
-            <strong id="statsOutputSize">
-              0 B
-            </strong>
-          </div>
-
-        </div>
-
         <div
-          id="matchedRules"
-          class="matched-rules"
-          hidden
+          id="largeOutputNotice"
+          class="large-output-notice hidden"
         >
-
-          <h4>
-            Matched rules
-          </h4>
-
-          <ul id="matchedRulesList"></ul>
-
+          This sanitized result is larger than the browser preview limit.
+          Download the file to access the complete result.
         </div>
-
       </div>
-
     </div>
-
   </div>
 </section>
 
-<section class="how-it-works">
-
+<section
+  id="how-it-works"
+  class="content-section"
+  aria-labelledby="howTitle"
+>
   <div class="container">
+    <div class="section-heading narrow">
+      <span class="section-kicker">
+        How it works
+      </span>
 
-    <div class="section-title">
-
-      <p class="eyebrow">
-        HOW IT WORKS
-      </p>
-
-      <h2>
-        Your diagnostic content stays on your device
+      <h2 id="howTitle">
+        Local log sanitization without the upload step
       </h2>
 
       <p>
-        SanitizeLog is designed around local processing. The browser
-        performs the sanitization operation without sending the diagnostic
-        content to a remote processing service.
+        SanitizeLog is designed for diagnostic data that may contain
+        credentials, tokens or other values that should not be shared
+        unnecessarily.
       </p>
-
     </div>
 
     <div class="steps-grid">
-
       <article class="step-card">
-
-        <div class="step-number">
-          01
-        </div>
+        <span class="step-number">01</span>
 
         <h3>
-          Provide your logs
+          Select your file
         </h3>
 
         <p>
-          Paste diagnostic output into the input area or load a local
-          diagnostic file.
+          Choose a supported diagnostic or configuration file up to
+          500 MB, or paste text directly into the sanitizer.
         </p>
-
       </article>
 
       <article class="step-card">
-
-        <div class="step-number">
-          02
-        </div>
+        <span class="step-number">02</span>
 
         <h3>
-          Apply security rules
+          Process locally
         </h3>
 
         <p>
-          The selected security profile scans the content using its
-          configured sanitization rules.
+          A Web Worker processes the content in your browser while the
+          interface reports byte-based progress in real time.
         </p>
-
       </article>
 
       <article class="step-card">
-
-        <div class="step-number">
-          03
-        </div>
+        <span class="step-number">03</span>
 
         <h3>
-          Generate sanitized output
+          Review and download
         </h3>
 
         <p>
-          Detected sensitive values are replaced with deterministic
-          security tokens while preserving the surrounding diagnostic
-          structure.
+          Review replacement statistics and download the sanitized
+          result without changing your original input file.
         </p>
-
       </article>
-
     </div>
-
   </div>
-
 </section>
 
-<section class="security-section">
-
+<section
+  id="supported-formats"
+  class="content-section alternate-section"
+  aria-labelledby="formatsTitle"
+>
   <div class="container">
+    <div class="section-heading narrow">
+      <span class="section-kicker">
+        Supported formats
+      </span>
 
-    <div class="security-card">
+      <h2 id="formatsTitle">
+        Common diagnostic and configuration files
+      </h2>
 
-      <div class="security-content">
+      <p>
+        The current interface accepts common text-based diagnostic and
+        configuration formats.
+      </p>
+    </div>
 
-        <p class="eyebrow">
-          PRIVACY BY DESIGN
-        </p>
+    <div class="format-grid">
+      <span>TXT</span>
+      <span>LOG</span>
+      <span>CONF</span>
+      <span>CFG</span>
+      <span>CONFIG</span>
+      <span>OUT</span>
+      <span>JSON</span>
+      <span>YAML</span>
+      <span>YML</span>
+      <span>XML</span>
+      <span>CSV</span>
+      <span>INI</span>
+    </div>
 
-        <h2>
-          Diagnostic content is processed locally
+    <div class="capability-note">
+      <strong>Current security baseline</strong>
+
+      <p>
+        The current default profile detects bearer JWT patterns and
+        generic password key-value assignments. Detection rules are
+        profile based and can be expanded independently from the user
+        interface.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section
+  class="content-section"
+  aria-labelledby="privacyTitle"
+>
+  <div class="container">
+    <div class="privacy-grid">
+      <div>
+        <span class="section-kicker">
+          Privacy by design
+        </span>
+
+        <h2 id="privacyTitle">
+          Keep diagnostic data in your browser
         </h2>
 
         <p>
-          SanitizeLog is designed so the sanitization engine runs inside
-          your browser. This makes it suitable for sensitive diagnostic
-          logs that should not be unnecessarily uploaded to a third-party
-          processing service.
+          SanitizeLog is designed around local processing. The sanitizer
+          runs inside a browser Web Worker rather than requiring the
+          original diagnostic file to be uploaded to a remote processing
+          service.
         </p>
-
-        <ul class="security-list">
-
-          <li>
-            No account required
-          </li>
-
-          <li>
-            No diagnostic log upload required
-          </li>
-
-          <li>
-            No server-side sanitization dependency
-          </li>
-
-          <li>
-            Browser Web Worker processing
-          </li>
-
-          <li>
-            Deterministic token replacement
-          </li>
-
-        </ul>
-
       </div>
 
+      <div class="privacy-list">
+        <div>
+          <strong>Client-side processing</strong>
+          <span>
+            Sanitization logic executes in the browser.
+          </span>
+        </div>
+
+        <div>
+          <strong>500 MB input limit</strong>
+          <span>
+            Large files use Blob streaming rather than file.text().
+          </span>
+        </div>
+
+        <div>
+          <strong>Original stays unchanged</strong>
+          <span>
+            The sanitizer creates a separate sanitized result.
+          </span>
+        </div>
+
+        <div>
+          <strong>Transparent progress</strong>
+          <span>
+            Progress is calculated from bytes processed.
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section
+  id="faq"
+  class="content-section faq-section"
+  aria-labelledby="faqTitle"
+>
+  <div class="container narrow-container">
+    <div class="section-heading narrow">
+      <span class="section-kicker">
+        Frequently asked questions
+      </span>
+
+      <h2 id="faqTitle">
+        SanitizeLog FAQ
+      </h2>
     </div>
 
-  </div>
+    <div class="faq-list">
+      <details>
+        <summary>
+          What is SanitizeLog?
+        </summary>
 
+        <p>
+          SanitizeLog is a browser-based diagnostic log and configuration
+          sanitizer. It detects supported sensitive values and replaces
+          them with deterministic security tokens without requiring the
+          original file to be uploaded to a server.
+        </p>
+      </details>
+
+      <details>
+        <summary>
+          Does SanitizeLog upload my log file?
+        </summary>
+
+        <p>
+          The sanitizer is designed to process the selected file locally
+          in your browser using a Web Worker. The original file does not
+          need to be uploaded to a remote processing server.
+        </p>
+      </details>
+
+      <details>
+        <summary>
+          Can I sanitize a 500 MB log file?
+        </summary>
+
+        <p>
+          Yes. The current application supports input files up to
+          500 MB. Large file processing uses browser Blob streaming and
+          incremental decoding instead of calling file.text() on the
+          entire input.
+        </p>
+      </details>
+
+      <details>
+        <summary>
+          How does the percentage progress work?
+        </summary>
+
+        <p>
+          Progress is based on bytes processed compared with the total
+          input size. The sanitizer updates the percentage, progress bar
+          and processed byte count while the Web Worker processes the
+          file.
+        </p>
+      </details>
+
+      <details>
+        <summary>
+          What does the current security profile detect?
+        </summary>
+
+        <p>
+          The current default security baseline includes bearer JWT
+          patterns and generic password key-value assignments. The
+          ruleset can evolve independently as additional detection rules
+          are added.
+        </p>
+      </details>
+
+      <details>
+        <summary>
+          Does sanitization modify my original file?
+        </summary>
+
+        <p>
+          No. The selected input is treated as the source content. The
+          sanitizer generates a separate sanitized result that can be
+          downloaded.
+        </p>
+      </details>
+    </div>
+  </div>
 </section>
 
 
   </main>
 
   <footer class="site-footer">
+    <div class="container footer-inner">
+      <div>
+        <strong>SanitizeLog</strong>
+        <span>
+          Browser-based diagnostic log sanitization.
+        </span>
+      </div>
 
 
-<div class="container footer-inner">
-
-  <div>
-
-    <strong>
-      SanitizeLog
-    </strong>
-
-    <p>
-      Privacy-focused diagnostic log sanitization.
-    </p>
-
-  </div>
-
-  <div class="footer-links">
-
+  <div class="footer-meta">
     <span>
-      No signup. No registration.
+      No signup
     </span>
 
     <span>
-      Client-side processing.
+      No server-side file processing
     </span>
 
+    <span>
+      500 MB maximum input
+    </span>
   </div>
-
 </div>
 
 
   </footer>
+
+  <noscript>
+    <div class="noscript-message">
+      SanitizeLog requires JavaScript because file processing is performed
+      locally in your browser.
+    </div>
+  </noscript>
 
   <script src="./app.js"></script>
 
