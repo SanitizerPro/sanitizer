@@ -1,8 +1,31 @@
 {
-  "name": "diagnostic-sanitizer-v1",
+  "name": "sanitizerpro",
   "version": "1.0.0",
+  "description": "Local-first browser data protection for AI platforms, AI search, coding assistants, and search engines.",
+  "private": true,
   "type": "module",
+
   "scripts": {
-    "test": "node --test test/*.test.js"
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "validate": "node scripts/validate.mjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "node --test",
+    "test:watch": "node --test --watch",
+    "check": "npm run lint && npm run test && npm run validate",
+    "security:audit": "npm audit --audit-level=high",
+    "package": "npm run check && npm run build"
+  },
+
+  "devDependencies": {
+    "@eslint/js": "^9.38.0",
+    "eslint": "^9.38.0",
+    "web-ext": "^9.1.0"
+  },
+
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
   }
 }
