@@ -1,17 +1,7 @@
 const MAX_FILE_BYTES = 500 * 1024 * 1024;
-const MAX_FILE_MB = 500;
+const MAX_DISPLAY_OUTPUT_BYTES = 10 * 1024 * 1024;
 
-/*
-
-* Loading a very large sanitized output into a textarea would
-* unnecessarily create another large JavaScript string.
-*
-* Outputs up to this size are displayed in the textarea.
-* Larger outputs remain as a Blob and can be downloaded directly.
-  */
-  const MAX_DISPLAY_OUTPUT_BYTES = 10 * 1024 * 1024;
-
-const SUPPORTED_FILE_EXTENSIONS = [
+const SUPPORTED_EXTENSIONS = new Set([
 '.txt',
 '.log',
 '.conf',
@@ -24,108 +14,829 @@ const SUPPORTED_FILE_EXTENSIONS = [
 '.xml',
 '.csv',
 '.ini'
+]);
+
+const state = {
+worker: null,
+busy: false,
+selectedFile: null,
+inputMode: 'file',
+inputSizeBytes: 0,
+outputBlob: null,
+outputText: null,
+outputSizeBytes: 0,
+lastStats: null,
+lastProgress: 0
+};
+
+const dom = {};
+
+document.addEventListener(
+'DOMContentLoaded',
+initialize
+);
+
+function initialize() {
+cacheDom();
+validateDom();
+initializeWorker();
+initializeProfiles();
+initializeInputModes();
+initializeFileInput();
+initializeDragAndDrop();
+initializeTextInput();
+initializeActions();
+resetUI();
+}
+
+function cacheDom() {
+dom.fileModeButton =
+document.getElementById(
+'fileModeButton'
+);
+
+dom.textModeButton =
+document.getElementById(
+'textModeButton'
+);
+
+dom.fileInputPanel =
+document.getElementById(
+'fileInputPanel'
+);
+
+dom.textInputPanel =
+document.getElementById(
+'textInputPanel'
+);
+
+dom.dropZone =
+document.getElementById(
+'dropZone'
+);
+
+dom.fileInput =
+document.getElementById(
+'fileInput'
+);
+
+dom.selectedFile =
+document.getElementById(
+'selectedFile'
+);
+
+dom.selectedFileName =
+document.getElementById(
+'selectedFileName'
+);
+
+dom.selectedFileSize =
+document.getElementById(
+'selectedFileSize'
+);
+
+dom.removeFileButton =
+document.getElementById(
+'removeFileButton'
+);
+
+dom.inputText =
+document.getElementById(
+'inputText'
+);
+
+dom.textInputSize =
+document.getElementById(
+'textInputSize'
+);
+
+dom.profileSelect =
+document.getElementById(
+'profileSelect'
+);
+
+dom.strictMode =
+document.getElementById(
+'strictMode'
+);
+
+dom.statusPanel =
+document.getElementById(
+'statusPanel'
+);
+
+dom.statusIndicator =
+document.getElementById(
+'statusIndicator'
+);
+
+dom.statusText =
+document.getElementById(
+'statusText'
+);
+
+dom.statusMessage =
+document.getElementById(
+'statusMessage'
+);
+
+dom.progressContainer =
+document.getElementById(
+'progressContainer'
+);
+
+dom.progressLabel =
+document.getElementById(
+'progressLabel'
+);
+
+dom.progressPercent =
+document.getElementById(
+'progressPercent'
+);
+
+dom.progressBar =
+document.getElementById(
+'progressBar'
+);
+
+dom.progressFill =
+document.getElementById(
+'progressFill'
+);
+
+dom.processedSize =
+document.getElementById(
+'processedSize'
+);
+
+dom.progressMatchCount =
+document.getElementById(
+'progressMatchCount'
+);
+
+dom.errorPanel =
+document.getElementById(
+'errorPanel'
+);
+
+dom.errorTitle =
+document.getElementById(
+'errorTitle'
+);
+
+dom.errorText =
+document.getElementById(
+'errorText'
+);
+
+dom.sanitizeButton =
+document.getElementById(
+'sanitizeButton'
+);
+
+dom.cancelButton =
+document.getElementById(
+'cancelButton'
+);
+
+dom.clearButton =
+document.getElementById(
+'clearButton'
+);
+
+dom.resultSection =
+document.getElementById(
+'resultSection'
+);
+
+dom.outputStatus =
+document.getElementById(
+'outputStatus'
+);
+
+dom.statsInputSize =
+document.getElementById(
+'statsInputSize'
+);
+
+dom.statsOutputSize =
+document.getElementById(
+'statsOutputSize'
+);
+
+dom.rulesMatched =
+document.getElementById(
+'rulesMatched'
+);
+
+dom.totalMatches =
+document.getElementById(
+'totalMatches'
+);
+
+dom.matchedRulesList =
+document.getElementById(
+'matchedRulesList'
+);
+
+dom.outputPreviewNotice =
+document.getElementById(
+'outputPreviewNotice'
+);
+
+dom.outputText =
+document.getElementById(
+'outputText'
+);
+
+dom.largeOutputNotice =
+document.getElementById(
+'largeOutputNotice'
+);
+
+dom.copyButton =
+document.getElementById(
+'copyButton'
+);
+
+dom.downloadButton =
+document.getElementById(
+'downloadButton'
+);
+}
+
+function validateDom() {
+for (
+const [name, element] of Object.entries(
+dom
+)
+) {
+if (!element) {
+throw new Error(
+`SanitizeLog UI initialization failed: missing element '${name}'.`
+);
+}
+}
+}
+
+function initializeWorker() {
+terminateWorker();
+
+state.worker =
+new Worker(
+'./sanitizer.worker.js'
+);
+
+state.worker.onmessage =
+handleWorkerMessage;
+
+state.worker.onerror =
+handleWorkerError;
+
+state.worker.onmessageerror =
+() => {
+handleApplicationError(
+new Error(
+'The sanitizer worker returned an invalid message.'
+)
+);
+};
+}
+
+function initializeProfiles() {
+const profiles = [
+{
+id: 'DEFAULT_SECURITY',
+name: 'Default Security Baseline'
+}
 ];
 
-const inputElement =
-document.getElementById('inputText');
+dom.profileSelect.innerHTML = '';
 
-const outputElement =
-document.getElementById('outputText');
+for (
+const profile of profiles
+) {
+const option =
+document.createElement(
+'option'
+);
 
-const fileInput =
-document.getElementById('fileInput');
+```
+option.value =
+  profile.id;
 
-const clearButton =
-document.getElementById('clearButton');
+option.textContent =
+  profile.name;
 
-const sanitizeButton =
-document.getElementById('sanitizeButton');
+dom.profileSelect.appendChild(
+  option
+);
+```
 
-const copyButton =
-document.getElementById('copyButton');
+}
+}
 
-const downloadButton =
-document.getElementById('downloadButton');
+function initializeInputModes() {
+dom.fileModeButton.addEventListener(
+'click',
+() => {
+setInputMode('file');
+}
+);
 
-const strictMode =
-document.getElementById('strictMode');
+dom.textModeButton.addEventListener(
+'click',
+() => {
+setInputMode('text');
+}
+);
+}
 
-const profileSelect =
-document.getElementById('profileSelect');
+function setInputMode(mode) {
+if (state.busy) {
+return;
+}
 
-const statusPanel =
-document.getElementById('statusPanel');
+state.inputMode =
+mode;
 
-const statusText =
-document.getElementById('statusText');
+const fileMode =
+mode === 'file';
 
-const progressPercent =
-document.getElementById('progressPercent');
+dom.fileModeButton.classList.toggle(
+'active',
+fileMode
+);
 
-const progressBar =
-document.getElementById('progressBar');
+dom.textModeButton.classList.toggle(
+'active',
+!fileMode
+);
 
-const errorPanel =
-document.getElementById('errorPanel');
+dom.fileModeButton.setAttribute(
+'aria-selected',
+String(fileMode)
+);
 
-const errorText =
-document.getElementById('errorText');
+dom.textModeButton.setAttribute(
+'aria-selected',
+String(!fileMode)
+);
 
-const inputSize =
-document.getElementById('inputSize');
+dom.fileInputPanel.hidden =
+!fileMode;
 
-const outputSize =
-document.getElementById('outputSize');
+dom.textInputPanel.hidden =
+fileMode;
 
-const outputStatus =
-document.getElementById('outputStatus');
+if (!fileMode) {
+dom.inputText.focus();
+}
+}
 
-const rulesMatched =
-document.getElementById('rulesMatched');
+function initializeFileInput() {
+dom.fileInput.addEventListener(
+'change',
+(event) => {
+const file =
+event.target.files &&
+event.target.files[0];
 
-const totalMatches =
-document.getElementById('totalMatches');
+```
+  if (file) {
+    selectFile(file);
+  }
+}
+```
 
-const statsInputSize =
-document.getElementById('statsInputSize');
+);
 
-const statsOutputSize =
-document.getElementById('statsOutputSize');
+dom.removeFileButton.addEventListener(
+'click',
+removeSelectedFile
+);
+}
 
-const matchedRules =
-document.getElementById('matchedRules');
+function initializeDragAndDrop() {
+const zone =
+dom.dropZone;
 
-const matchedRulesList =
-document.getElementById('matchedRulesList');
+const dragEvents = [
+'dragenter',
+'dragover'
+];
 
-let worker = null;
+for (
+const eventName of dragEvents
+) {
+zone.addEventListener(
+eventName,
+(event) => {
+event.preventDefault();
+event.stopPropagation();
 
-let selectedFile = null;
+```
+    if (!state.busy) {
+      zone.classList.add(
+        'drag-over'
+      );
+    }
+  }
+);
+```
 
-let selectedFileName =
-'sanitized-output.txt';
+}
 
-let lastOutputText = '';
+const leaveEvents = [
+'dragleave',
+'dragend',
+'drop'
+];
 
-let lastOutputBlob = null;
+for (
+const eventName of leaveEvents
+) {
+zone.addEventListener(
+eventName,
+(event) => {
+event.preventDefault();
+event.stopPropagation();
 
-let lastInputBytes = 0;
+```
+    zone.classList.remove(
+      'drag-over'
+    );
+  }
+);
+```
 
-let lastOutputBytes = 0;
+}
 
-const COMMON_RULES = [
+zone.addEventListener(
+'drop',
+(event) => {
+if (state.busy) {
+return;
+}
+
+```
+  const file =
+    event.dataTransfer &&
+    event.dataTransfer.files &&
+    event.dataTransfer.files[0];
+
+  if (file) {
+    selectFile(file);
+  }
+}
+```
+
+);
+}
+
+function initializeTextInput() {
+dom.inputText.addEventListener(
+'input',
+() => {
+const bytes =
+getUtf8ByteLength(
+dom.inputText.value
+);
+
+```
+  dom.textInputSize.textContent =
+    formatBytes(bytes);
+}
+```
+
+);
+}
+
+function initializeActions() {
+dom.sanitizeButton.addEventListener(
+'click',
+sanitize
+);
+
+dom.cancelButton.addEventListener(
+'click',
+cancelSanitization
+);
+
+dom.clearButton.addEventListener(
+'click',
+clearAll
+);
+
+dom.copyButton.addEventListener(
+'click',
+copyOutput
+);
+
+dom.downloadButton.addEventListener(
+'click',
+downloadOutput
+);
+}
+
+function selectFile(file) {
+if (state.busy) {
+return;
+}
+
+clearError();
+
+const validation =
+validateFile(file);
+
+if (!validation.valid) {
+showError(
+'Invalid file',
+validation.message
+);
+
+```
+return;
+```
+
+}
+
+state.selectedFile =
+file;
+
+state.inputSizeBytes =
+file.size;
+
+dom.selectedFileName.textContent =
+file.name;
+
+dom.selectedFileSize.textContent =
+`${formatBytes(file.size)} · ${getFileExtension(file.name).toUpperCase()}`;
+
+dom.selectedFile.classList.remove(
+'hidden'
+);
+
+setStatus(
+'Ready',
+`${file.name} is ready to sanitize.`,
+'idle'
+);
+
+dom.resultSection.classList.add(
+'hidden'
+);
+}
+
+function removeSelectedFile() {
+if (state.busy) {
+return;
+}
+
+state.selectedFile =
+null;
+
+state.inputSizeBytes =
+0;
+
+dom.fileInput.value =
+'';
+
+dom.selectedFile.classList.add(
+'hidden'
+);
+
+setStatus(
+'Ready',
+'Select a file or paste text to begin.',
+'idle'
+);
+}
+
+function validateFile(file) {
+if (!(file instanceof File)) {
+return {
+valid: false,
+message:
+'The selected input is not a valid file.'
+};
+}
+
+if (
+file.size >
+MAX_FILE_BYTES
+) {
+return {
+valid: false,
+message:
+`The selected file is ${formatBytes(file.size)}. ` +
+`The maximum supported input size is ${formatBytes(MAX_FILE_BYTES)}.`
+};
+}
+
+const extension =
+getFileExtension(
+file.name
+);
+
+if (
+!SUPPORTED_EXTENSIONS.has(
+extension
+)
+) {
+return {
+valid: false,
+message:
+`Unsupported file format '${extension || 'unknown'}'. ` +
+'Please choose a supported text-based diagnostic or configuration file.'
+};
+}
+
+return {
+valid: true
+};
+}
+
+function getFileExtension(
+filename
+) {
+const lastDot =
+filename.lastIndexOf('.');
+
+if (
+lastDot === -1
+) {
+return '';
+}
+
+return filename
+.slice(lastDot)
+.toLowerCase();
+}
+
+function sanitize() {
+if (state.busy) {
+return;
+}
+
+clearError();
+clearResult();
+
+let content;
+let inputSizeBytes;
+
+if (
+state.inputMode ===
+'file'
+) {
+if (!state.selectedFile) {
+showError(
+'No file selected',
+'Choose a supported log or configuration file before starting sanitization.'
+);
+
+```
+  return;
+}
+
+const validation =
+  validateFile(
+    state.selectedFile
+  );
+
+if (!validation.valid) {
+  showError(
+    'Invalid file',
+    validation.message
+  );
+
+  return;
+}
+
+content =
+  state.selectedFile;
+
+inputSizeBytes =
+  state.selectedFile.size;
+```
+
+} else {
+content =
+dom.inputText.value;
+
+```
+inputSizeBytes =
+  getUtf8ByteLength(
+    content
+  );
+
+if (
+  inputSizeBytes === 0
+) {
+  showError(
+    'No text provided',
+    'Paste diagnostic text before starting sanitization.'
+  );
+
+  return;
+}
+
+if (
+  inputSizeBytes >
+  MAX_FILE_BYTES
+) {
+  showError(
+    'Input is too large',
+    `The pasted content is ${formatBytes(inputSizeBytes)}. ` +
+    `The maximum supported input size is ${formatBytes(MAX_FILE_BYTES)}.`
+  );
+
+  return;
+}
+```
+
+}
+
+state.inputSizeBytes =
+inputSizeBytes;
+
+state.outputBlob =
+null;
+
+state.outputText =
+null;
+
+state.outputSizeBytes =
+0;
+
+state.lastProgress =
+0;
+
+state.lastStats =
+null;
+
+state.busy =
+true;
+
+setProcessingUI();
+
+const profileId =
+dom.profileSelect.value ||
+'DEFAULT_SECURITY';
+
+const payload = {
+content,
+rules: getRulesForProfile(
+profileId
+),
+options: {
+strict:
+dom.strictMode.checked
+}
+};
+
+try {
+state.worker.postMessage(
+{
+type: 'START',
+payload
+}
+);
+} catch (error) {
+state.busy =
+false;
+
+```
+handleApplicationError(
+  error
+);
+```
+
+}
+}
+
+function getRulesForProfile(
+profileId
+) {
+if (
+profileId ===
+'DEFAULT_SECURITY'
+) {
+return [
 {
 id: 'common-jwt',
-description: 'JSON Web Token (JWT)',
+description:
+'JSON Web Token (JWT)',
 scope: 'line',
 regex:
-/bearer\s+(eyJ[a-zA-Z0-9_-]+.[a-zA-Z0-9_-]+.[a-zA-Z0-9_.-]+)/gi,
+/bearer\s+(eyJ[a-zA-Z0-9_-]+.eyJ[a-zA-Z0-9_-]+.[a-zA-Z0-9_.-]+)/gi,
 replacementGroup: 1,
 tokenType: 'JWT'
 },
-
 {
-id: 'common-password-assignment',
+id:
+'common-password-assignment',
 description:
 'Generic key-value password pattern',
 scope: 'line',
@@ -135,213 +846,100 @@ replacementGroup: 2,
 tokenType: 'PASSWORD'
 }
 ];
-
-const PROFILES = {
-DEFAULT_SECURITY: {
-id: 'DEFAULT_SECURITY',
-name: 'Default Security Baseline',
-description:
-'Standard security detection profile',
-rules: COMMON_RULES
 }
-};
 
-/* =========================================================
-INITIALIZATION
-========================================================= */
+throw new Error(
+`Unknown security profile '${profileId}'.`
+);
+}
 
-initialize();
+function setProcessingUI() {
+dom.sanitizeButton.disabled =
+true;
 
-function initialize() {
-validateDom();
+dom.clearButton.disabled =
+true;
 
-populateProfiles();
+dom.cancelButton.classList.remove(
+'hidden'
+);
 
-updateInputSize();
+dom.cancelButton.disabled =
+false;
 
-updateOutputState();
+dom.progressContainer.classList.remove(
+'hidden'
+);
 
-updateStatistics({
-matches: {}
-});
+dom.progressLabel.textContent =
+'Sanitizing...';
 
-setProgress(0);
+updateProgress(
+0,
+0,
+state.inputSizeBytes
+);
 
 setStatus(
-'Ready',
-'Add diagnostic content or load a local file.'
+'Sanitizing',
+'Processing your file locally in your browser.',
+'processing'
 );
 
-inputElement.addEventListener(
-'input',
-handleInputChange
-);
-
-fileInput.addEventListener(
-'change',
-handleFileSelection
-);
-
-clearButton.addEventListener(
-'click',
-clearInput
-);
-
-sanitizeButton.addEventListener(
-'click',
-sanitize
-);
-
-copyButton.addEventListener(
-'click',
-copyOutput
-);
-
-downloadButton.addEventListener(
-'click',
-downloadOutput
-);
-
-window.addEventListener(
-'beforeunload',
-() => {
-terminateWorker();
-}
+dom.resultSection.classList.add(
+'hidden'
 );
 }
 
-/* =========================================================
-DOM VALIDATION
-========================================================= */
+function handleWorkerMessage(
+event
+) {
+const message =
+event.data;
 
-function validateDom() {
-const requiredElements = [
-['inputText', inputElement],
-['outputText', outputElement],
-['fileInput', fileInput],
-['clearButton', clearButton],
-['sanitizeButton', sanitizeButton],
-['copyButton', copyButton],
-['downloadButton', downloadButton],
-['strictMode', strictMode],
-['profileSelect', profileSelect],
-['statusPanel', statusPanel],
-['statusText', statusText],
-['progressPercent', progressPercent],
-['progressBar', progressBar],
-['errorPanel', errorPanel],
-['errorText', errorText],
-['inputSize', inputSize],
-['outputSize', outputSize],
-['outputStatus', outputStatus],
-['rulesMatched', rulesMatched],
-['totalMatches', totalMatches],
-['statsInputSize', statsInputSize],
-['statsOutputSize', statsOutputSize],
-['matchedRules', matchedRules],
-['matchedRulesList', matchedRulesList]
-];
-
-const missing =
-requiredElements
-.filter(([, element]) => !element)
-.map(([id]) => id);
-
-if (missing.length > 0) {
-throw new Error(
-`SanitizeLog UI initialization failed. Missing elements: ${missing.join(', ')}`
+if (
+!message ||
+typeof message.type !==
+'string'
+) {
+handleApplicationError(
+new Error(
+'The sanitizer worker returned an invalid response.'
+)
 );
-}
-}
-
-/* =========================================================
-PROFILES
-========================================================= */
-
-function populateProfiles() {
-profileSelect.replaceChildren();
-
-for (const profile of Object.values(PROFILES)) {
-const option =
-document.createElement('option');
 
 ```
-option.value = profile.id;
-
-option.textContent = profile.name;
-
-profileSelect.appendChild(option);
+return;
 ```
 
 }
-}
 
-/* =========================================================
-WORKER MANAGEMENT
-========================================================= */
-
-function createWorker() {
-terminateWorker();
-
-worker = new Worker(
-'./sanitizer.worker.js',
-{
-type: 'classic'
-}
-);
-
-worker.addEventListener(
-'message',
-handleWorkerMessage
-);
-
-worker.addEventListener(
-'error',
-handleWorkerError
-);
-
-return worker;
-}
-
-function terminateWorker() {
-if (worker) {
-worker.terminate();
-worker = null;
-}
-}
-
-function handleWorkerError(event) {
-const message =
-event?.message ||
-'The sanitization worker encountered an unexpected error.';
-
-handleError(message);
-}
-
-/* =========================================================
-WORKER MESSAGE HANDLING
-========================================================= */
-
-function handleWorkerMessage(event) {
-const message =
-event.data || {};
-
-switch (message.type) {
+switch (
+message.type
+) {
 case 'PROGRESS':
-handleProgress(message.payload);
+handleProgress(
+message.payload
+);
 break;
 
 ```
 case 'COMPLETE':
-  handleComplete(message.payload);
+  handleCompleteText(
+    message.payload
+  );
   break;
 
 case 'COMPLETE_BLOB':
-  handleCompleteBlob(message.payload);
+  handleCompleteBlob(
+    message.payload
+  );
   break;
 
 case 'ERROR':
-  handleError(message.error);
+  handleWorkerErrorMessage(
+    message.error
+  );
   break;
 
 case 'CANCELLED':
@@ -349,1103 +947,1044 @@ case 'CANCELLED':
   break;
 
 default:
-  handleError(
-    `Unexpected worker message type '${message.type}'.`
+  handleApplicationError(
+    new Error(
+      `Unexpected worker message type '${message.type}'.`
+    )
   );
-  break;
 ```
 
 }
 }
 
-/* =========================================================
-PROGRESS
-========================================================= */
-
-function handleProgress(payload) {
+function handleProgress(
+payload
+) {
 if (!payload) {
 return;
 }
 
-const processedBytes =
-Number.isFinite(payload.processedBytes)
-? payload.processedBytes
-: 0;
-
 const totalBytes =
-Number.isFinite(payload.totalBytes)
-? payload.totalBytes
-: 0;
+Number(
+payload.totalBytes
+);
+
+const processedBytes =
+Number(
+payload.processedBytes
+);
 
 let percent =
-Number.isFinite(payload.percent)
-? payload.percent
-: 0;
+Number(
+payload.percent
+);
+
+if (
+!Number.isFinite(
+percent
+)
+) {
+percent =
+totalBytes > 0
+? (
+processedBytes /
+totalBytes
+) *
+100
+: 100;
+}
 
 percent =
 Math.max(
 0,
-Math.min(100, percent)
+Math.min(
+100,
+Math.floor(percent)
+)
 );
 
-setProgress(percent);
+if (
+percent <
+state.lastProgress
+) {
+percent =
+state.lastProgress;
+}
 
-setStatus(
-'Sanitizing',
-`Processed ${formatBytes(processedBytes)} of ${formatBytes(totalBytes)}.`
+state.lastProgress =
+percent;
+
+updateProgress(
+percent,
+processedBytes,
+totalBytes
 );
 }
 
-/* =========================================================
-COMPLETE: TEXT INPUT
-========================================================= */
-
-function handleComplete(payload) {
-if (!payload) {
-handleError(
-'Worker returned an invalid COMPLETE payload.'
+function updateProgress(
+percent,
+processedBytes,
+totalBytes
+) {
+const safePercent =
+Math.max(
+0,
+Math.min(
+100,
+Math.floor(
+Number(percent) || 0
+)
+)
 );
+
+dom.progressPercent.textContent =
+`${safePercent}%`;
+
+dom.progressFill.style.width =
+`${safePercent}%`;
+
+dom.progressBar.setAttribute(
+'aria-valuenow',
+String(safePercent)
+);
+
+dom.processedSize.textContent =
+`${formatBytes(processedBytes)} / ${formatBytes(totalBytes)} processed`;
+
+const currentMatches =
+getTotalMatches(
+state.lastStats
+);
+
+dom.progressMatchCount.textContent =
+`${currentMatches} ${currentMatches === 1 ? 'match' : 'matches'}`;
+}
+
+function handleCompleteText(
+payload
+) {
+if (!payload) {
+handleApplicationError(
+new Error(
+'The sanitizer completed without a result payload.'
+)
+);
+
+```
 return;
+```
+
 }
 
 const sanitizedText =
-String(
-payload.sanitizedText ?? ''
-);
+typeof payload.sanitizedText ===
+'string'
+? payload.sanitizedText
+: '';
 
-const outputBytes =
-getUtf8ByteLength(sanitizedText);
-
-const blob =
+const outputBlob =
 new Blob(
 [sanitizedText],
 {
-type: 'text/plain;charset=utf-8'
+type:
+'text/plain;charset=utf-8'
 }
 );
 
-finishSanitization({
-outputTextValue: sanitizedText,
-outputBlob: blob,
-outputBytes,
-stats:
-payload.stats || {
-matches: {}
-}
-});
+finalizeResult(
+outputBlob,
+sanitizedText,
+payload.stats
+);
 }
 
-/* =========================================================
-COMPLETE: BLOB INPUT
-========================================================= */
-
-async function handleCompleteBlob(payload) {
+async function handleCompleteBlob(
+payload
+) {
 if (
 !payload ||
 !(payload.blob instanceof Blob)
 ) {
-handleError(
-'Worker returned an invalid COMPLETE_BLOB payload.'
+handleApplicationError(
+new Error(
+'The sanitizer completed without a valid output Blob.'
+)
 );
+
+```
 return;
+```
+
 }
 
-const outputBlob =
+const blob =
 payload.blob;
 
-const outputBytes =
-outputBlob.size;
-
-/*
-
-* Do not call blob.text() for large files.
-*
-* This would create a potentially 500 MB JavaScript
-* string and defeat the large-file architecture.
-  */
-  let displayText = '';
+let previewText =
+null;
 
 if (
-outputBytes <=
+blob.size <=
 MAX_DISPLAY_OUTPUT_BYTES
 ) {
 try {
-displayText =
-await outputBlob.text();
-} catch (error) {
-handleError(
-error instanceof Error
-? error.message
-: String(error)
+previewText =
+await blob.text();
+} catch {
+previewText =
+null;
+}
+}
+
+finalizeResult(
+blob,
+previewText,
+payload.stats
 );
-return;
-}
 }
 
-finishSanitization({
-outputTextValue: displayText,
-outputBlob,
-outputBytes,
-stats:
-payload.stats || {
-matches: {}
-}
-});
-}
-
-/* =========================================================
-FINISH
-========================================================= */
-
-function finishSanitization({
-outputTextValue,
-outputBlob,
-outputBytes,
+function finalizeResult(
+blob,
+previewText,
 stats
-}) {
-lastOutputText =
-outputTextValue || '';
+) {
+state.busy =
+false;
 
-lastOutputBlob =
-outputBlob || null;
+state.outputBlob =
+blob;
 
-lastOutputBytes =
-Number.isFinite(outputBytes)
-? outputBytes
-: 0;
+state.outputText =
+previewText;
 
-const inputBytes =
-getCurrentInputBytes();
+state.outputSizeBytes =
+blob.size;
 
-lastInputBytes =
-inputBytes;
+state.lastStats =
+stats || {
+matches: {}
+};
 
-outputElement.value =
-lastOutputText;
+updateProgress(
+100,
+state.inputSizeBytes,
+state.inputSizeBytes
+);
 
-inputSize.textContent =
-formatBytes(inputBytes);
-
-outputSize.textContent =
-formatBytes(lastOutputBytes);
-
-statsInputSize.textContent =
-formatBytes(inputBytes);
-
-statsOutputSize.textContent =
-formatBytes(lastOutputBytes);
-
-updateStatistics(stats);
-
-setProgress(100);
+dom.progressLabel.textContent =
+'Sanitization complete';
 
 setStatus(
-'Completed',
-'Sanitization completed successfully.'
+'Complete',
+'Your sanitized result is ready.',
+'success'
+);
+
+dom.cancelButton.classList.add(
+'hidden'
+);
+
+dom.clearButton.disabled =
+false;
+
+dom.sanitizeButton.disabled =
+false;
+
+renderResult(
+stats
+);
+}
+
+function renderResult(
+stats
+) {
+dom.resultSection.classList.remove(
+'hidden'
+);
+
+dom.statsInputSize.textContent =
+formatBytes(
+state.inputSizeBytes
+);
+
+dom.statsOutputSize.textContent =
+formatBytes(
+state.outputSizeBytes
+);
+
+const matches =
+normalizeMatches(
+stats
+);
+
+const totalMatches =
+Object.values(
+matches
+).reduce(
+(
+total,
+value
+) =>
+total +
+Number(value || 0),
+0
+);
+
+const matchedRules =
+Object.keys(
+matches
+).filter(
+(ruleId) =>
+Number(
+matches[ruleId]
+) > 0
+);
+
+dom.rulesMatched.textContent =
+String(
+matchedRules.length
+);
+
+dom.totalMatches.textContent =
+String(
+totalMatches
+);
+
+renderMatchedRules(
+matchedRules,
+matches
 );
 
 if (
-lastOutputBytes >
-MAX_DISPLAY_OUTPUT_BYTES
+state.outputText !==
+null
 ) {
-outputStatus.textContent =
-`Large output ready for download. ` +
-`Preview is disabled above ${formatMB(MAX_DISPLAY_OUTPUT_BYTES)}.`;
-} else if (lastOutputBytes > 0) {
-outputStatus.textContent =
-'Sanitized output is ready.';
-} else {
-outputStatus.textContent =
-'Sanitization completed with empty output.';
-}
+dom.outputText.value =
+state.outputText;
 
-copyButton.disabled =
-lastOutputText.length === 0;
-
-downloadButton.disabled =
-!lastOutputBlob ||
-lastOutputBytes === 0;
-
-sanitizeButton.disabled =
-false;
-
-terminateWorker();
-}
-
-/* =========================================================
-ERROR
-========================================================= */
-
-function handleError(message) {
-const errorMessage =
-message ||
-'Sanitization failed.';
-
-errorPanel.hidden = false;
-
-errorText.textContent =
-errorMessage;
-
-setStatus(
-'Failed',
-'The sanitization operation failed.'
+```
+dom.outputText.classList.remove(
+  'hidden'
 );
 
-setProgress(0);
+dom.largeOutputNotice.classList.add(
+  'hidden'
+);
 
-lastOutputText =
+dom.copyButton.disabled =
+  false;
+
+dom.outputPreviewNotice.textContent =
+  `${formatBytes(state.outputSizeBytes)} preview loaded.`;
+```
+
+} else {
+dom.outputText.value =
 '';
 
-lastOutputBlob =
-null;
+```
+dom.outputText.classList.remove(
+  'hidden'
+);
 
-lastOutputBytes =
-0;
+dom.largeOutputNotice.classList.remove(
+  'hidden'
+);
 
-outputElement.value =
-'';
+dom.copyButton.disabled =
+  true;
 
-outputSize.textContent =
-'0 B';
+dom.outputPreviewNotice.textContent =
+  'Large result kept as a downloadable Blob.';
+```
 
-statsOutputSize.textContent =
-'0 B';
-
-outputStatus.textContent =
-'No output generated';
-
-copyButton.disabled =
-true;
-
-downloadButton.disabled =
-true;
-
-sanitizeButton.disabled =
-false;
-
-terminateWorker();
 }
 
-/* =========================================================
-CANCELLED
-========================================================= */
+dom.downloadButton.disabled =
+false;
+
+dom.outputStatus.textContent =
+totalMatches === 0
+? 'No configured sensitive values were detected.'
+: `${totalMatches} sensitive value${totalMatches === 1 ? '' : 's'} replaced.`;
+
+requestAnimationFrame(
+() => {
+dom.resultSection.scrollIntoView(
+{
+behavior:
+'smooth',
+block:
+'start'
+}
+);
+}
+);
+}
+
+function renderMatchedRules(
+ruleIds,
+matches
+) {
+dom.matchedRulesList.innerHTML =
+'';
+
+if (
+ruleIds.length ===
+0
+) {
+const item =
+document.createElement(
+'li'
+);
+
+```
+item.textContent =
+  'No configured rules matched';
+
+dom.matchedRulesList.appendChild(
+  item
+);
+
+return;
+```
+
+}
+
+for (
+const ruleId of ruleIds
+) {
+const item =
+document.createElement(
+'li'
+);
+
+```
+item.textContent =
+  `${getRuleDisplayName(ruleId)} · ${matches[ruleId]}`;
+
+dom.matchedRulesList.appendChild(
+  item
+);
+```
+
+}
+}
+
+function getRuleDisplayName(
+ruleId
+) {
+const names = {
+'common-jwt':
+'JWT',
+'common-password-assignment':
+'Password assignment'
+};
+
+return (
+names[ruleId] ||
+ruleId
+);
+}
+
+function normalizeMatches(
+stats
+) {
+if (
+!stats ||
+!stats.matches ||
+typeof stats.matches !==
+'object'
+) {
+return {};
+}
+
+return stats.matches;
+}
+
+function getTotalMatches(
+stats
+) {
+const matches =
+normalizeMatches(
+stats
+);
+
+return Object.values(
+matches
+).reduce(
+(
+total,
+value
+) =>
+total +
+Number(value || 0),
+0
+);
+}
+
+function cancelSanitization() {
+if (
+!state.busy ||
+!state.worker
+) {
+return;
+}
+
+dom.cancelButton.disabled =
+true;
+
+setStatus(
+'Cancelling',
+'Stopping the sanitization operation...',
+'processing'
+);
+
+try {
+state.worker.postMessage({
+type: 'CANCEL'
+});
+} catch (error) {
+handleApplicationError(
+error
+);
+}
+}
 
 function handleCancelled() {
-errorPanel.hidden = true;
+state.busy =
+false;
+
+state.outputBlob =
+null;
+
+state.outputText =
+null;
+
+state.outputSizeBytes =
+0;
+
+dom.cancelButton.classList.add(
+'hidden'
+);
+
+dom.cancelButton.disabled =
+false;
+
+dom.clearButton.disabled =
+false;
+
+dom.sanitizeButton.disabled =
+false;
+
+dom.progressContainer.classList.add(
+'hidden'
+);
 
 setStatus(
 'Cancelled',
-'The sanitization operation was cancelled.'
+'No sanitized output was produced.',
+'cancelled'
 );
+}
 
-setProgress(0);
-
-lastOutputText =
-'';
-
-lastOutputBlob =
-null;
-
-lastOutputBytes =
-0;
-
-outputElement.value =
-'';
-
-outputSize.textContent =
-'0 B';
-
-statsOutputSize.textContent =
-'0 B';
-
-outputStatus.textContent =
-'No output generated';
-
-copyButton.disabled =
-true;
-
-downloadButton.disabled =
-true;
-
-sanitizeButton.disabled =
+function handleWorkerErrorMessage(
+message
+) {
+state.busy =
 false;
 
-terminateWorker();
-}
-
-/* =========================================================
-SANITIZATION
-========================================================= */
-
-function sanitize() {
-hideError();
-
-const profile =
-PROFILES[
-profileSelect.value
-];
-
-if (!profile) {
-handleError(
-'Selected security profile was not found.'
-);
-return;
-}
-
-const hasSelectedFile =
-selectedFile instanceof File;
-
-const content =
-hasSelectedFile
-? selectedFile
-: inputElement.value;
-
-if (
-!hasSelectedFile &&
-!content
-) {
-handleError(
-'Enter diagnostic content or select a file before sanitizing.'
-);
-return;
-}
-
-if (hasSelectedFile) {
-const validation =
-validateSelectedFile(
-selectedFile
+dom.cancelButton.classList.add(
+'hidden'
 );
 
-```
-if (!validation.valid) {
-  handleError(
-    validation.message
-  );
-  return;
-}
-```
+dom.cancelButton.disabled =
+false;
 
-}
+dom.clearButton.disabled =
+false;
 
-resetOutputForProcessing();
+dom.sanitizeButton.disabled =
+false;
 
-sanitizeButton.disabled =
-true;
+dom.progressContainer.classList.add(
+'hidden'
+);
 
-setProgress(0);
+showError(
+'Sanitization failed',
+message ||
+'The sanitizer worker reported an unknown error.'
+);
 
 setStatus(
-'Starting',
-hasSelectedFile
-? `Preparing ${selectedFile.name} for local streaming sanitization...`
-: 'Initializing local sanitization...'
+'Failed',
+'The original input was not modified.',
+'error'
+);
+}
+
+function handleWorkerError(
+event
+) {
+const message =
+event &&
+event.message
+? event.message
+: 'The sanitizer worker stopped unexpectedly.';
+
+handleApplicationError(
+new Error(message)
+);
+}
+
+function handleApplicationError(
+error
+) {
+state.busy =
+false;
+
+dom.cancelButton.classList.add(
+'hidden'
 );
 
-try {
-const activeWorker =
-createWorker();
+dom.cancelButton.disabled =
+false;
 
-```
-activeWorker.postMessage({
-  type: 'START',
+dom.clearButton.disabled =
+false;
 
-  payload: {
-    content,
+dom.sanitizeButton.disabled =
+false;
 
-    rules:
-      profile.rules,
+dom.progressContainer.classList.add(
+'hidden'
+);
 
-    options: {
-      strict:
-        Boolean(
-          strictMode.checked
-        )
-    }
-  }
-});
-```
-
-} catch (error) {
-handleError(
+showError(
+'Sanitization failed',
 error instanceof Error
 ? error.message
 : String(error)
 );
-}
-}
 
-/* =========================================================
-FILE VALIDATION
-========================================================= */
-
-function validateSelectedFile(file) {
-if (!(file instanceof File)) {
-return {
-valid: false,
-message:
-'The selected file is invalid.'
-};
-}
-
-if (file.size > MAX_FILE_BYTES) {
-return {
-valid: false,
-message:
-`The selected file is too large. ` +
-`The maximum supported file size is ${MAX_FILE_MB} MB. ` +
-`Selected size: ${formatBytes(file.size)}.`
-};
-}
-
-const fileName =
-file.name.toLowerCase();
-
-const supported =
-SUPPORTED_FILE_EXTENSIONS.some(
-(extension) =>
-fileName.endsWith(extension)
+setStatus(
+'Failed',
+'The original input was not modified.',
+'error'
 );
-
-if (!supported) {
-return {
-valid: false,
-message:
-'Unsupported file format. Supported formats are TXT, LOG, CONF, CFG, CONFIG, OUT, JSON, YAML, YML, XML, CSV and INI.'
-};
-}
-
-return {
-valid: true,
-message: ''
-};
-}
-
-/* =========================================================
-FILE SELECTION
-========================================================= */
-
-function handleFileSelection(event) {
-const file =
-event.target.files?.[0];
-
-if (!file) {
-return;
-}
-
-hideError();
-
-const validation =
-validateSelectedFile(file);
-
-if (!validation.valid) {
-selectedFile = null;
-
-```
-fileInput.value = '';
-
-handleError(
-  validation.message
-);
-
-return;
-```
-
-}
 
 terminateWorker();
-
-selectedFile =
-file;
-
-selectedFileName =
-buildOutputFileName(
-file.name
-);
-
-/*
-
-* Do not read the file into inputElement.value.
-*
-* That would convert a 500 MB file into a huge
-* JavaScript string before the worker starts.
-  */
-
-inputElement.value = '';
-
-lastOutputText =
-'';
-
-lastOutputBlob =
-null;
-
-lastOutputBytes =
-0;
-
-lastInputBytes =
-file.size;
-
-inputSize.textContent =
-formatBytes(file.size);
-
-outputSize.textContent =
-'0 B';
-
-statsInputSize.textContent =
-formatBytes(file.size);
-
-statsOutputSize.textContent =
-'0 B';
-
-outputElement.value =
-'';
-
-outputStatus.textContent =
-'No output generated';
-
-updateStatistics({
-matches: {}
-});
-
-setProgress(0);
-
-setStatus(
-'Ready',
-`${file.name} selected. ${formatBytes(file.size)} will be processed locally.`
-);
-
-copyButton.disabled =
-true;
-
-downloadButton.disabled =
-true;
-
-sanitizeButton.disabled =
-false;
+initializeWorker();
 }
-
-/* =========================================================
-INPUT CHANGES
-========================================================= */
-
-function handleInputChange() {
-/*
-
-* If the user starts typing/pasting after selecting
-* a file, the text becomes the active input source.
-  */
-  if (inputElement.value.length > 0) {
-  selectedFile = null;
-
-```
-fileInput.value = '';
-```
-
-```
-selectedFileName =
-  'sanitized-output.txt';
-```
-
-}
-
-updateInputSize();
-
-if (!inputElement.value) {
-setStatus(
-'Ready',
-selectedFile
-? `${selectedFile.name} selected.`
-: 'Add diagnostic content or load a local file.'
-);
-}
-}
-
-/* =========================================================
-CLEAR
-========================================================= */
-
-function clearInput() {
-terminateWorker();
-
-selectedFile =
-null;
-
-selectedFileName =
-'sanitized-output.txt';
-
-lastOutputText =
-'';
-
-lastOutputBlob =
-null;
-
-lastInputBytes =
-0;
-
-lastOutputBytes =
-0;
-
-inputElement.value =
-'';
-
-outputElement.value =
-'';
-
-fileInput.value =
-'';
-
-inputSize.textContent =
-'0 B';
-
-outputSize.textContent =
-'0 B';
-
-statsInputSize.textContent =
-'0 B';
-
-statsOutputSize.textContent =
-'0 B';
-
-outputStatus.textContent =
-'No output generated';
-
-updateStatistics({
-matches: {}
-});
-
-hideError();
-
-setProgress(0);
-
-setStatus(
-'Ready',
-'Add diagnostic content or load a local file.'
-);
-
-copyButton.disabled =
-true;
-
-downloadButton.disabled =
-true;
-
-sanitizeButton.disabled =
-false;
-}
-
-/* =========================================================
-OUTPUT RESET
-========================================================= */
-
-function resetOutputForProcessing() {
-lastOutputText =
-'';
-
-lastOutputBlob =
-null;
-
-lastOutputBytes =
-0;
-
-outputElement.value =
-'';
-
-outputSize.textContent =
-'0 B';
-
-statsOutputSize.textContent =
-'0 B';
-
-outputStatus.textContent =
-'Processing...';
-
-updateStatistics({
-matches: {}
-});
-
-copyButton.disabled =
-true;
-
-downloadButton.disabled =
-true;
-}
-
-/* =========================================================
-COPY
-========================================================= */
 
 async function copyOutput() {
-if (!lastOutputText) {
-return;
-}
-
-try {
-await navigator.clipboard.writeText(
-lastOutputText
-);
-
-```
-setStatus(
-  'Completed',
-  'Sanitized output copied to the clipboard.'
-);
-```
-
-} catch {
-try {
-outputElement.focus();
-
-```
-  outputElement.select();
-
-  const copied =
-    document.execCommand(
-      'copy'
-    );
-
-  setStatus(
-    'Completed',
-    copied
-      ? 'Sanitized output copied to the clipboard.'
-      : 'Clipboard access was not available. Select and copy the output manually.'
-  );
-} catch {
-  setStatus(
-    'Completed',
-    'Clipboard access was not available. Select and copy the output manually.'
-  );
-}
-```
-
-}
-}
-
-/* =========================================================
-DOWNLOAD
-========================================================= */
-
-function downloadOutput() {
 if (
-!lastOutputBlob ||
-lastOutputBytes === 0
+typeof state.outputText !==
+'string'
 ) {
 return;
 }
 
+try {
+if (
+navigator.clipboard &&
+typeof navigator.clipboard.writeText ===
+'function'
+) {
+await navigator.clipboard.writeText(
+state.outputText
+);
+} else {
+dom.outputText.focus();
+dom.outputText.select();
+document.execCommand(
+'copy'
+);
+dom.outputText.setSelectionRange(
+0,
+0
+);
+}
+
+```
+const original =
+  dom.copyButton.textContent;
+
+dom.copyButton.textContent =
+  'Copied';
+
+window.setTimeout(
+  () => {
+    dom.copyButton.textContent =
+      original;
+  },
+  1500
+);
+```
+
+} catch (error) {
+showError(
+'Copy failed',
+'The browser did not allow the sanitized output to be copied automatically.'
+);
+}
+}
+
+function downloadOutput() {
+if (
+!(state.outputBlob instanceof Blob)
+) {
+return;
+}
+
+const filename =
+buildOutputFilename();
+
 const url =
 URL.createObjectURL(
-lastOutputBlob
+state.outputBlob
 );
 
 const anchor =
-document.createElement('a');
+document.createElement(
+'a'
+);
 
 anchor.href =
 url;
 
 anchor.download =
-selectedFileName;
+filename;
+
+anchor.style.display =
+'none';
 
 document.body.appendChild(
 anchor
 );
 
 anchor.click();
-
 anchor.remove();
 
-/*
-
-* Delay revocation slightly so the browser has
-* sufficient time to begin the download.
-  */
-  setTimeout(() => {
-  URL.revokeObjectURL(url);
-  }, 1000);
-
-setStatus(
-'Completed',
-'Sanitized output downloaded locally.'
+window.setTimeout(
+() => {
+URL.revokeObjectURL(
+url
+);
+},
+1000
 );
 }
 
-/* =========================================================
-STATISTICS
-========================================================= */
+function buildOutputFilename() {
+if (
+state.selectedFile
+) {
+const original =
+state.selectedFile.name;
 
-function updateStatistics(stats) {
-const matches =
-stats &&
-stats.matches &&
-typeof stats.matches === 'object'
-? stats.matches
-: {};
+```
+const dot =
+  original.lastIndexOf('.');
 
-const entries =
-Object.entries(matches)
-.filter(
-([, count]) =>
-Number.isFinite(count) &&
-count > 0
+if (
+  dot > 0
+) {
+  return (
+    original.slice(
+      0,
+      dot
+    ) +
+    '-sanitized' +
+    original.slice(dot)
+  );
+}
+
+return (
+  original +
+  '-sanitized'
 );
+```
 
-const matchedRuleCount =
-entries.length;
+}
 
-const totalMatchCount =
-entries.reduce(
-(total, [, count]) =>
-total + count,
-0
-);
+return 'sanitized-output.txt';
+}
 
-rulesMatched.textContent =
-String(
-matchedRuleCount
-);
-
-totalMatches.textContent =
-String(
-totalMatchCount
-);
-
-matchedRules.hidden =
-entries.length === 0;
-
-matchedRulesList.replaceChildren();
-
-if (entries.length === 0) {
+function clearAll() {
+if (state.busy) {
+cancelSanitization();
 return;
 }
 
-for (
-const [ruleId, count]
-of entries
-) {
-const row =
-document.createElement(
-'li'
+state.selectedFile =
+null;
+
+state.inputSizeBytes =
+0;
+
+state.outputBlob =
+null;
+
+state.outputText =
+null;
+
+state.outputSizeBytes =
+0;
+
+state.lastStats =
+null;
+
+state.lastProgress =
+0;
+
+dom.fileInput.value =
+'';
+
+dom.inputText.value =
+'';
+
+dom.textInputSize.textContent =
+'0 B';
+
+dom.selectedFile.classList.add(
+'hidden'
 );
 
-```
-const name =
-  document.createElement(
-    'span'
-  );
+clearError();
+clearResult();
 
-name.className =
-  'matched-rule-name';
-
-name.textContent =
-  ruleId;
-
-const countElement =
-  document.createElement(
-    'span'
-  );
-
-countElement.className =
-  'matched-rule-count';
-
-countElement.textContent =
-  `${count} match${
-    count === 1
-      ? ''
-      : 'es'
-  }`;
-
-row.append(
-  name,
-  countElement
+dom.progressContainer.classList.add(
+'hidden'
 );
 
-matchedRulesList.appendChild(
-  row
-);
-```
+dom.progressFill.style.width =
+'0%';
 
-}
-}
+dom.progressPercent.textContent =
+'0%';
 
-/* =========================================================
-INPUT / OUTPUT SIZES
-========================================================= */
-
-function updateInputSize() {
-const bytes =
-getCurrentInputBytes();
-
-lastInputBytes =
-bytes;
-
-inputSize.textContent =
-formatBytes(bytes);
-
-statsInputSize.textContent =
-formatBytes(bytes);
-}
-
-function getCurrentInputBytes() {
-if (selectedFile) {
-return selectedFile.size;
-}
-
-return getUtf8ByteLength(
-inputElement.value
-);
-}
-
-/* =========================================================
-STATUS
-========================================================= */
-
-function setStatus(
-label,
-message
-) {
-statusText.textContent =
-label;
-
-/*
-
-* The current HTML contains only statusText
-* and progressPercent inside the status panel.
-*
-* Keep the detailed message available through
-* the accessible status text without requiring
-* an additional DOM element.
-  */
-  statusPanel.setAttribute(
-  'aria-label',
-  `${label}. ${message}`
-  );
-  }
-
-function setProgress(percent) {
-const safePercent =
-Math.max(
-0,
-Math.min(
-100,
-Number.isFinite(percent)
-? percent
-: 0
-)
-);
-
-progressBar.style.width =
-`${safePercent}%`;
-
-progressBar.setAttribute(
+dom.progressBar.setAttribute(
 'aria-valuenow',
-String(safePercent)
+'0'
 );
 
-progressPercent.textContent =
-`${safePercent}%`;
+setStatus(
+'Ready',
+'Select a file or paste text to begin.',
+'idle'
+);
+
+setInputMode(
+'file'
+);
 }
 
-/* =========================================================
-ERROR UI
-========================================================= */
+function clearResult() {
+dom.resultSection.classList.add(
+'hidden'
+);
 
-function hideError() {
-errorPanel.hidden =
+dom.outputText.value =
+'';
+
+dom.largeOutputNotice.classList.add(
+'hidden'
+);
+
+dom.copyButton.disabled =
 true;
 
-errorText.textContent =
+dom.downloadButton.disabled =
+true;
+
+dom.matchedRulesList.innerHTML =
+'';
+
+dom.statsInputSize.textContent =
+'0 B';
+
+dom.statsOutputSize.textContent =
+'0 B';
+
+dom.rulesMatched.textContent =
+'0';
+
+dom.totalMatches.textContent =
+'0';
+}
+
+function clearError() {
+dom.errorPanel.classList.add(
+'hidden'
+);
+
+dom.errorText.textContent =
 '';
 }
 
-/* =========================================================
-BYTE / SIZE UTILITIES
-========================================================= */
+function showError(
+title,
+message
+) {
+dom.errorTitle.textContent =
+title;
 
-function getUtf8ByteLength(text) {
+dom.errorText.textContent =
+message;
+
+dom.errorPanel.classList.remove(
+'hidden'
+);
+}
+
+function setStatus(
+title,
+message,
+type
+) {
+dom.statusText.textContent =
+title;
+
+dom.statusMessage.textContent =
+message;
+
+dom.statusPanel.classList.remove(
+'status-idle',
+'status-processing',
+'status-success',
+'status-error',
+'status-cancelled'
+);
+
+dom.statusPanel.classList.add(
+`status-${type}`
+);
+}
+
+function resetUI() {
+state.busy =
+false;
+
+dom.sanitizeButton.disabled =
+false;
+
+dom.cancelButton.classList.add(
+'hidden'
+);
+
+dom.clearButton.disabled =
+false;
+
+dom.progressContainer.classList.add(
+'hidden'
+);
+
+dom.resultSection.classList.add(
+'hidden'
+);
+
+dom.errorPanel.classList.add(
+'hidden'
+);
+
+setStatus(
+'Ready',
+'Select a file or paste text to begin.',
+'idle'
+);
+}
+
+function terminateWorker() {
+if (
+state.worker
+) {
+try {
+state.worker.terminate();
+} catch {
+// Worker termination is best-effort.
+}
+
+```
+state.worker =
+  null;
+```
+
+}
+}
+
+function getUtf8ByteLength(
+value
+) {
+if (
+typeof TextEncoder !==
+'undefined'
+) {
 return new TextEncoder()
-.encode(
-String(
-text ?? ''
-)
-)
+.encode(value)
 .byteLength;
 }
 
-function formatBytes(bytes) {
+return unescape(
+encodeURIComponent(
+value
+)
+).length;
+}
+
+function formatBytes(
+bytes
+) {
+const value =
+Number(bytes);
+
 if (
-!Number.isFinite(bytes) ||
-bytes <= 0
+!Number.isFinite(
+value
+) ||
+value <= 0
 ) {
 return '0 B';
 }
 
-if (bytes < 1024) {
-return `${Math.round(bytes)} B`;
-}
+const units = [
+'B',
+'KB',
+'MB',
+'GB'
+];
 
-if (
-bytes <
-1024 * 1024
-) {
-return `${(
-      bytes / 1024
-    ).toFixed(1)} KB`;
-}
-
-if (
-bytes <
-1024 * 1024 * 1024
-) {
-return `${(
-      bytes /
-      (1024 * 1024)
-    ).toFixed(1)} MB`;
-}
-
-return `${(
-    bytes /
-    (1024 * 1024 * 1024)
-  ).toFixed(2)} GB`;
-}
-
-function formatMB(bytes) {
-return Math.round(
-bytes /
-(1024 * 1024)
-) + ' MB';
-}
-
-/* =========================================================
-FILE NAME
-========================================================= */
-
-function buildOutputFileName(
-fileName
-) {
-if (
-typeof fileName !== 'string' ||
-fileName.length === 0
-) {
-return 'sanitized-output.txt';
-}
-
-const dotIndex =
-fileName.lastIndexOf('.');
-
-if (
-dotIndex <= 0
-) {
-return `${fileName}-sanitized.txt`;
-}
-
-const base =
-fileName.slice(
-0,
-dotIndex
+const exponent =
+Math.min(
+Math.floor(
+Math.log(value) /
+Math.log(1024)
+),
+units.length - 1
 );
 
-const extension =
-fileName.slice(
-dotIndex
+const amount =
+value /
+Math.pow(
+1024,
+exponent
 );
 
-return `${base}-sanitized${extension}`;
+const decimals =
+exponent === 0
+? 0
+: amount >= 100
+? 0
+: amount >= 10
+? 1
+: 2;
+
+return (
+amount.toFixed(
+decimals
+) +
+' ' +
+units[exponent]
+);
 }
