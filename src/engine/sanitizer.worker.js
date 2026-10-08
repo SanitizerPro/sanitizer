@@ -18,11 +18,7 @@ if (data.type === 'CANCEL') {
 if (currentAbortController) {
 currentAbortController.abort();
 }
-
-```
 return;
-```
-
 }
 
 if (data.type !== 'START') {
@@ -30,15 +26,10 @@ dispatchMessage(postMessage, {
 type: 'ERROR',
 error: "Unsupported worker message type '" + data.type + "'."
 });
-
-```
 return;
-```
-
 }
 
 currentAbortController = new AbortController();
-
 const signal = currentAbortController.signal;
 
 try {
@@ -70,10 +61,8 @@ if (isBlobInput) {
     postMessage
   });
 } else {
-  const textInput = String(content ?? '');
-
   await processTextContent({
-    textInput,
+    textInput: String(content ?? ''),
     rules,
     options,
     tokenMap,
@@ -92,7 +81,8 @@ type: 'CANCELLED'
 } else {
 dispatchMessage(postMessage, {
 type: 'ERROR',
-error: err instanceof Error
+error:
+err instanceof Error
 ? err.message
 : String(err)
 });
@@ -202,41 +192,35 @@ throw new Error('Operation cancelled');
 }
 
 ```
-  const { value, done } = await reader.read();
+  const result = await reader.read();
 
-  if (done) {
+  if (result.done) {
     break;
   }
 
-  if (typeof value !== 'string') {
+  if (typeof result.value !== 'string') {
     throw new Error(
       'Streaming decoder returned invalid text data.'
     );
   }
 
-  textBuffer += value;
+  textBuffer += result.value;
 
-  /*
-   * TextDecoderStream returns decoded text. Re-encode the decoded
-   * chunk to maintain UTF-8 byte-based progress accounting.
-   */
-  const encodedChunkBytes = new TextEncoder()
-    .encode(value)
+  processedBytes += new TextEncoder()
+    .encode(result.value)
     .byteLength;
 
-  processedBytes += encodedChunkBytes;
-
-  const completeLines =
+  const extracted =
     extractCompleteLines(textBuffer);
 
-  textBuffer = completeLines.remaining;
+  textBuffer = extracted.remaining;
 
-  for (const line of completeLines.lines) {
+  for (const line of extracted.lines) {
     if (signal.aborted) {
       throw new Error('Operation cancelled');
     }
 
-    const result = processLine(
+    const processed = processLine(
       line.rawLine,
       line.lineEnding,
       lineRules,
@@ -247,21 +231,20 @@ throw new Error('Operation cancelled');
         activeBlockBytes
       },
       tokenMap,
-      stats,
-      Boolean(options.strict)
+      stats
     );
 
     activeBlockRule =
-      result.activeBlockRule;
+      processed.activeBlockRule;
 
     activeBlockBuffer =
-      result.activeBlockBuffer;
+      processed.activeBlockBuffer;
 
     activeBlockBytes =
-      result.activeBlockBytes;
+      processed.activeBlockBytes;
 
-    if (result.output !== null) {
-      outputChunks.push(result.output);
+    if (processed.output !== null) {
+      outputChunks.push(processed.output);
     }
   }
 
@@ -272,18 +255,10 @@ throw new Error('Operation cancelled');
   );
 }
 
-/*
- * Process a final line that has no terminating newline.
- */
 if (textBuffer.length > 0) {
-  const finalLine = {
-    rawLine: textBuffer,
-    lineEnding: ''
-  };
-
-  const result = processLine(
-    finalLine.rawLine,
-    finalLine.lineEnding,
+  const processed = processLine(
+    textBuffer,
+    '',
     lineRules,
     blockRules,
     {
@@ -292,29 +267,23 @@ if (textBuffer.length > 0) {
       activeBlockBytes
     },
     tokenMap,
-    stats,
-    Boolean(options.strict)
+    stats
   );
 
   activeBlockRule =
-    result.activeBlockRule;
+    processed.activeBlockRule;
 
   activeBlockBuffer =
-    result.activeBlockBuffer;
+    processed.activeBlockBuffer;
 
   activeBlockBytes =
-    result.activeBlockBytes;
+    processed.activeBlockBytes;
 
-  if (result.output !== null) {
-    outputChunks.push(result.output);
+  if (processed.output !== null) {
+    outputChunks.push(processed.output);
   }
 }
 
-/*
- * A block that reaches EOF without its closing pattern is
- * rejected in strict mode. In non-strict mode the original
- * block is preserved.
- */
 if (activeBlockRule) {
   if (options.strict) {
     throw new Error(
@@ -360,9 +329,7 @@ dispatchMessage(postMessage, {
 try {
 await reader.cancel();
 } catch {
-/*
-* Reader cancellation is best-effort during cleanup.
-*/
+// Best-effort stream cleanup.
 }
 }
 }
@@ -404,6 +371,14 @@ return;
 
 }
 
+if (totalBytes > MAX_FILE_BYTES) {
+throw new Error(
+'Input text exceeds the maximum supported size of ' +
+formatMB(MAX_FILE_BYTES) +
+'.'
+);
+}
+
 const lineRules = rules.filter(
 (rule) => (rule.scope ?? 'line') !== 'block'
 );
@@ -428,11 +403,7 @@ if (signal.aborted) {
 dispatchMessage(postMessage, {
 type: 'CANCELLED'
 });
-
-```
 return;
-```
-
 }
 
 dispatchMessage(postMessage, {
@@ -455,7 +426,8 @@ strict,
 signal,
 postMessage
 }) {
-const lines = splitLinesWithEndings(textInput);
+const lines =
+splitLinesWithEndings(textInput);
 
 const outputLines = [];
 
@@ -471,12 +443,6 @@ throw new Error('Operation cancelled');
 }
 
 ```
-const lineByteCount = new TextEncoder()
-  .encode(
-    line.rawLine + line.lineEnding
-  )
-  .byteLength;
-
 const result = processLine(
   line.rawLine,
   line.lineEnding,
@@ -488,8 +454,7 @@ const result = processLine(
     activeBlockBytes
   },
   tokenMap,
-  stats,
-  strict
+  stats
 );
 
 activeBlockRule =
@@ -505,7 +470,11 @@ if (result.output !== null) {
   outputLines.push(result.output);
 }
 
-processedBytes += lineByteCount;
+processedBytes += new TextEncoder()
+  .encode(
+    line.rawLine + line.lineEnding
+  )
+  .byteLength;
 
 dispatchProgress(
   postMessage,
@@ -541,36 +510,37 @@ lineRules,
 blockRules,
 blockState,
 tokenMap,
-stats,
-strict
+stats
 ) {
-let {
-activeBlockRule,
-activeBlockBuffer,
-activeBlockBytes
-} = blockState;
+let activeBlockRule =
+blockState.activeBlockRule;
 
-const lineByteCount = new TextEncoder()
+let activeBlockBuffer =
+blockState.activeBlockBuffer;
+
+let activeBlockBytes =
+blockState.activeBlockBytes;
+
+const lineByteCount =
+new TextEncoder()
 .encode(
 rawLine + lineEnding
 )
 .byteLength;
 
-/*
-
-* Continue an existing block.
-  */
-  if (activeBlockRule) {
-  const maxAllowedBytes =
-  activeBlockRule.maxBytes ??
-  DEFAULT_MAX_BLOCK_BYTES;
+if (activeBlockRule) {
+const maxAllowedBytes =
+activeBlockRule.maxBytes ??
+DEFAULT_MAX_BLOCK_BYTES;
 
 ```
-activeBlockBytes += lineByteCount;
-```
+activeBlockBytes +=
+  lineByteCount;
 
-```
-if (activeBlockBytes > maxAllowedBytes) {
+if (
+  activeBlockBytes >
+  maxAllowedBytes
+) {
   throw new Error(
     "Rule '" +
     activeBlockRule.id +
@@ -589,7 +559,7 @@ if (
     rawLine
   )
 ) {
-  const redactedBlock =
+  const output =
     applyBlockReplacement(
       activeBlockRule,
       activeBlockBuffer,
@@ -598,7 +568,7 @@ if (
     );
 
   return {
-    output: redactedBlock,
+    output,
     activeBlockRule: null,
     activeBlockBuffer: '',
     activeBlockBytes: 0
@@ -615,25 +585,19 @@ return {
 
 }
 
-/*
-
-* Look for a new block.
-  */
-  for (const blockRule of blockRules) {
-  if (
-  !testRegex(
-  blockRule.startRegex,
-  rawLine
-  )
-  ) {
-  continue;
-  }
+for (const blockRule of blockRules) {
+if (
+!testRegex(
+blockRule.startRegex,
+rawLine
+)
+) {
+continue;
+}
 
 ```
 activeBlockRule = blockRule;
-```
 
-```
 activeBlockBuffer =
   rawLine + lineEnding;
 
@@ -657,17 +621,13 @@ if (
   );
 }
 
-/*
- * Support a block whose start and end occur
- * on the same line.
- */
 if (
   testRegex(
     blockRule.endRegex,
     rawLine
   )
 ) {
-  const redactedBlock =
+  const output =
     applyBlockReplacement(
       blockRule,
       activeBlockBuffer,
@@ -676,7 +636,7 @@ if (
     );
 
   return {
-    output: redactedBlock,
+    output,
     activeBlockRule: null,
     activeBlockBuffer: '',
     activeBlockBytes: 0
@@ -693,14 +653,11 @@ return {
 
 }
 
-/*
-
-* Normal line processing.
-  */
-  let currentLine = rawLine;
+let currentLine = rawLine;
 
 for (const rule of lineRules) {
-currentLine = executeLineRule(
+currentLine =
+executeLineRule(
 rule,
 currentLine,
 tokenMap,
@@ -723,15 +680,10 @@ text,
 tokenMap,
 stats
 ) {
-/*
-
-* Clone the RegExp so a global/sticky rule cannot
-* leak lastIndex state between lines.
-  */
-  const regex = new RegExp(
-  rule.regex.source,
-  rule.regex.flags
-  );
+const regex = new RegExp(
+rule.regex.source,
+rule.regex.flags
+);
 
 return text.replace(
 regex,
@@ -739,25 +691,15 @@ regex,
 const match = args[0];
 
 ```
-  /*
-   * String.replace callback arguments are:
-   *
-   * match
-   * capture groups...
-   * offset
-   * complete string
-   * groups
-   *
-   * The final two values are excluded here.
-   */
-  const captureGroups = args
-    .slice(1, args.length - 2)
-    .map(
-      (group) =>
-        group === undefined
-          ? ''
-          : group
-    );
+  const captureGroups =
+    args
+      .slice(1, args.length - 2)
+      .map(
+        (group) =>
+          group === undefined
+            ? ''
+            : group
+      );
 
   return applyReplacement(
     rule,
@@ -791,15 +733,11 @@ function testRegex(
 regex,
 value
 ) {
-/*
-
-* Always clone the rule RegExp because rules may
-* contain global or sticky flags.
-  */
-  const safeRegex = new RegExp(
-  regex.source,
-  regex.flags
-  );
+const safeRegex =
+new RegExp(
+regex.source,
+regex.flags
+);
 
 safeRegex.lastIndex = 0;
 
@@ -814,52 +752,57 @@ const lines = [];
 let start = 0;
 
 for (
-let i = 0;
-i < buffer.length;
-i++
+let index = 0;
+index < buffer.length;
+index++
 ) {
-const char = buffer[i];
+const character =
+buffer[index];
 
 ```
-/*
- * LF
- */
-if (char === '\n') {
+if (character === '\n') {
   lines.push({
     rawLine:
-      buffer.slice(start, i),
+      buffer.slice(
+        start,
+        index
+      ),
     lineEnding: '\n'
   });
 
-  start = i + 1;
+  start = index + 1;
 
   continue;
 }
 
-/*
- * CR or CRLF
- */
-if (char === '\r') {
+if (character === '\r') {
   if (
-    i + 1 < buffer.length &&
-    buffer[i + 1] === '\n'
+    index + 1 <
+      buffer.length &&
+    buffer[index + 1] === '\n'
   ) {
     lines.push({
       rawLine:
-        buffer.slice(start, i),
+        buffer.slice(
+          start,
+          index
+        ),
       lineEnding: '\r\n'
     });
 
-    i++;
-    start = i + 1;
+    index++;
+    start = index + 1;
   } else {
     lines.push({
       rawLine:
-        buffer.slice(start, i),
+        buffer.slice(
+          start,
+          index
+        ),
       lineEnding: '\r'
     });
 
-    start = i + 1;
+    start = index + 1;
   }
 }
 ```
@@ -887,7 +830,8 @@ while (
 (match = regex.exec(text)) !== null
 ) {
 if (
-match.index === regex.lastIndex
+match.index ===
+regex.lastIndex
 ) {
 regex.lastIndex++;
 }
@@ -949,7 +893,6 @@ function formatMB(bytes) {
 return (
 Math.round(
 bytes / 1024 / 1024
-) +
-' MB'
+) + ' MB'
 );
 }
