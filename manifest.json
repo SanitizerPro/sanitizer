@@ -1,0 +1,359 @@
+{
+  "manifest_version": 3,
+
+  "name": "SanitizerPro",
+  "short_name": "SanitizerPro",
+  "version": "1.0.0",
+
+  "description": "Local-first AI data protection for your browser. Detect, warn, mask, or block sensitive data before it reaches AI platforms, AI search, coding assistants, and search engines.",
+
+  "homepage_url": "https://github.com/SanitizerPro/sanitizer",
+
+  "action": {
+    "default_title": "SanitizerPro",
+    "default_popup": "public/popup.html"
+  },
+
+  "options_ui": {
+    "page": "public/options.html",
+    "open_in_tab": true
+  },
+
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+
+  "permissions": [
+    "storage"
+  ],
+
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+
+    "https://claude.ai/*",
+
+    "https://gemini.google.com/*",
+
+    "https://copilot.microsoft.com/*",
+
+    "https://www.perplexity.ai/*",
+    "https://perplexity.ai/*",
+
+    "https://grok.com/*",
+    "https://x.com/*",
+
+    "https://chat.deepseek.com/*",
+    "https://deepseek.com/*",
+
+    "https://meta.ai/*",
+
+    "https://chat.mistral.ai/*",
+    "https://mistral.ai/*",
+
+    "https://poe.com/*",
+
+    "https://character.ai/*",
+
+    "https://you.com/*",
+
+    "https://pi.ai/*",
+
+    "https://chat.qwen.ai/*",
+    "https://qwen.ai/*",
+
+    "https://kimi.com/*",
+    "https://kimi.moonshot.cn/*",
+
+    "https://huggingface.co/*",
+
+    "https://phind.com/*",
+
+    "https://chat.cohere.com/*",
+    "https://cohere.com/*",
+
+    "https://www.blackbox.ai/*",
+    "https://blackbox.ai/*",
+
+    "https://www.forefront.ai/*",
+    "https://forefront.ai/*",
+
+    "https://www.ora.ai/*",
+    "https://ora.ai/*",
+
+    "https://www.lepton.ai/*",
+    "https://lepton.ai/*",
+
+    "https://www.reka.ai/*",
+    "https://reka.ai/*",
+
+    "https://www.arena.ai/*",
+    "https://arena.ai/*",
+
+    "https://www.nat.dev/*",
+    "https://nat.dev/*",
+
+    "https://www.phind.com/*",
+
+    "https://replit.com/*",
+
+    "https://v0.dev/*",
+
+    "https://lovable.dev/*",
+
+    "https://bolt.new/*",
+
+    "https://stackblitz.com/*",
+
+    "https://www.windsurf.com/*",
+    "https://windsurf.com/*",
+
+    "https://codeium.com/*",
+
+    "https://sourcegraph.com/*",
+
+    "https://github.com/*",
+
+    "https://gitlab.com/*",
+
+    "https://www.tabnine.com/*",
+    "https://tabnine.com/*",
+
+    "https://www.cursor.com/*",
+    "https://cursor.com/*",
+
+    "https://www.google.com/*",
+    "https://www.google.co.uk/*",
+    "https://www.google.ca/*",
+    "https://www.google.com.au/*",
+    "https://www.google.de/*",
+    "https://www.google.fr/*",
+    "https://www.google.nl/*",
+    "https://www.google.ie/*",
+    "https://www.google.co.in/*",
+    "https://www.google.ae/*",
+
+    "https://www.bing.com/*",
+
+    "https://duckduckgo.com/*",
+
+    "https://search.yahoo.com/*",
+    "https://search.yahoo.co.uk/*",
+
+    "https://search.brave.com/*",
+
+    "https://www.startpage.com/*",
+    "https://startpage.com/*",
+
+    "https://www.ecosia.org/*",
+
+    "https://www.qwant.com/*",
+
+    "https://kagi.com/*",
+
+    "https://www.yandex.com/*",
+    "https://yandex.com/*",
+
+    "https://www.baidu.com/*",
+    "https://baidu.com/*",
+
+    "https://search.naver.com/*",
+    "https://www.naver.com/*",
+
+    "https://www.seznam.cz/*",
+
+    "https://search.aol.com/*",
+
+    "https://search.lycos.com/*",
+
+    "https://www.ask.com/*"
+  ],
+
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+
+        "https://claude.ai/*",
+
+        "https://gemini.google.com/*",
+
+        "https://copilot.microsoft.com/*",
+
+        "https://www.perplexity.ai/*",
+        "https://perplexity.ai/*",
+
+        "https://grok.com/*",
+        "https://x.com/*",
+
+        "https://chat.deepseek.com/*",
+        "https://deepseek.com/*",
+
+        "https://meta.ai/*",
+
+        "https://chat.mistral.ai/*",
+        "https://mistral.ai/*",
+
+        "https://poe.com/*",
+
+        "https://character.ai/*",
+
+        "https://you.com/*",
+
+        "https://pi.ai/*",
+
+        "https://chat.qwen.ai/*",
+        "https://qwen.ai/*",
+
+        "https://kimi.com/*",
+        "https://kimi.moonshot.cn/*",
+
+        "https://huggingface.co/*",
+
+        "https://phind.com/*",
+
+        "https://chat.cohere.com/*",
+        "https://cohere.com/*",
+
+        "https://www.blackbox.ai/*",
+        "https://blackbox.ai/*",
+
+        "https://www.forefront.ai/*",
+        "https://forefront.ai/*",
+
+        "https://www.ora.ai/*",
+        "https://ora.ai/*",
+
+        "https://www.lepton.ai/*",
+        "https://lepton.ai/*",
+
+        "https://www.reka.ai/*",
+        "https://reka.ai/*",
+
+        "https://www.arena.ai/*",
+        "https://arena.ai/*",
+
+        "https://www.nat.dev/*",
+        "https://nat.dev/*",
+
+        "https://replit.com/*",
+
+        "https://v0.dev/*",
+
+        "https://lovable.dev/*",
+
+        "https://bolt.new/*",
+
+        "https://stackblitz.com/*",
+
+        "https://www.windsurf.com/*",
+        "https://windsurf.com/*",
+
+        "https://codeium.com/*",
+
+        "https://sourcegraph.com/*",
+
+        "https://github.com/*",
+
+        "https://gitlab.com/*",
+
+        "https://www.tabnine.com/*",
+        "https://tabnine.com/*",
+
+        "https://www.cursor.com/*",
+        "https://cursor.com/*",
+
+        "https://www.google.com/*",
+        "https://www.google.co.uk/*",
+        "https://www.google.ca/*",
+        "https://www.google.com.au/*",
+        "https://www.google.de/*",
+        "https://www.google.fr/*",
+        "https://www.google.nl/*",
+        "https://www.google.ie/*",
+        "https://www.google.co.in/*",
+        "https://www.google.ae/*",
+
+        "https://www.bing.com/*",
+
+        "https://duckduckgo.com/*",
+
+        "https://search.yahoo.com/*",
+        "https://search.yahoo.co.uk/*",
+
+        "https://search.brave.com/*",
+
+        "https://www.startpage.com/*",
+        "https://startpage.com/*",
+
+        "https://www.ecosia.org/*",
+
+        "https://www.qwant.com/*",
+
+        "https://kagi.com/*",
+
+        "https://www.yandex.com/*",
+        "https://yandex.com/*",
+
+        "https://www.baidu.com/*",
+        "https://baidu.com/*",
+
+        "https://search.naver.com/*",
+        "https://www.naver.com/*",
+
+        "https://www.seznam.cz/*",
+
+        "https://search.aol.com/*",
+
+        "https://search.lycos.com/*",
+
+        "https://www.ask.com/*"
+      ],
+
+      "js": [
+        "src/content/content.js"
+      ],
+
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+
+  "icons": {
+    "16": "public/icons/icon16.png",
+    "32": "public/icons/icon32.png",
+    "48": "public/icons/icon48.png",
+    "128": "public/icons/icon128.png"
+  },
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; base-uri 'self'"
+  },
+
+  "commands": {
+    "toggle-protection": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
+      },
+      "description": "Toggle SanitizerPro protection"
+    },
+
+    "scan-selection": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+D",
+        "mac": "Command+Shift+D"
+      },
+      "description": "Scan selected text with SanitizerPro"
+    }
+  },
+
+  "minimum_chrome_version": "110"
+}
